@@ -134,22 +134,65 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(47, 110, 89,
 .view-intro h1 { font-size: 36px; line-height: 1.1; }
 .view-intro > div > p:last-child { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .mini-add { align-self: end; margin-bottom: 19px; white-space: nowrap; border: 1px solid var(--ink); border-radius: 999px; background: var(--mint); padding: 9px 11px; font-size: 11px; font-weight: 850; box-shadow: 2px 2px 0 var(--ink); cursor: pointer; }
-.zone-tabs { display: grid; grid-template-columns: 1fr 1fr; background: rgba(38,54,47,0.06); border-radius: 15px; padding: 4px; margin-bottom: 13px; }
-.zone-tabs button { min-height: 44px; border: 0; border-radius: 11px; background: transparent; color: var(--muted); cursor: pointer; font-weight: 750; font-size: 13px; }
-.zone-tabs button span { margin-right: 7px; }.zone-tabs button b { margin-left: 4px; font-size: 10px; }
-.zone-tabs button.active { color: var(--ink); background: var(--paper); box-shadow: 0 3px 9px rgba(38,54,47,0.08); }
-.fridge-cabinet { background: #c6dfca; border: 2px solid var(--ink); border-radius: 28px 28px 18px 18px; padding: 17px 14px 22px; box-shadow: inset 0 0 0 6px rgba(255,255,255,0.24), 6px 8px 0 rgba(38,54,47,0.14); position: relative; }
-.fridge-cabinet.frozen { background: var(--ice); }
-.cabinet-label { display: flex; align-items: center; justify-content: space-between; padding: 2px 7px 14px; border-bottom: 2px solid rgba(38,54,47,0.18); margin-bottom: 13px; }
-.cabinet-label span { font: 900 16px/1 "STKaiti", "Kaiti SC", serif; }.cabinet-label small { font-size: 9px; font-weight: 700; color: rgba(38,54,47,0.58); }
-.food-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.food-card { min-height: 152px; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 18px 16px 20px 17px; padding: 11px; position: relative; box-shadow: 3px 4px 0 rgba(38,54,47,0.22); overflow: hidden; }
-.food-card::after { content: ""; position: absolute; inset: auto -18px -28px auto; width: 64px; height: 64px; border-radius: 50%; background: var(--mint-soft); opacity: 0.7; }
-.food-card.danger::after { background: var(--tomato-soft); }.food-card.warning::after { background: #fff1bd; }
-.food-top { display: flex; justify-content: space-between; align-items: start; }.food-emoji { font-size: 37px; filter: drop-shadow(1px 3px 0 rgba(38,54,47,0.08)); }.status-dot { width: 10px; height: 10px; border-radius: 50%; margin: 3px 2px; border: 1px solid var(--ink); }.status-dot.safe, .legend i.safe { background: #77b57e; }.status-dot.warning, .legend i.warning { background: var(--yolk); }.status-dot.danger, .legend i.danger { background: var(--tomato); }
-.food-card h3 { margin: 7px 0 2px; font-size: 16px; }.food-card p { margin: 0; color: var(--muted); font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.days-label { position: absolute; left: 11px; bottom: 11px; font-size: 11px; color: var(--mint-dark); }.food-card.danger .days-label { color: var(--tomato); }.food-card.warning .days-label { color: #9a7320; }
-.shelf-line { height: 14px; margin: 15px -7px -10px; border-top: 3px solid rgba(38,54,47,0.28); display: flex; justify-content: space-between; padding: 0 18px; }.shelf-line i { width: 3px; height: 10px; background: rgba(38,54,47,0.2); }
-.legend { display: flex; justify-content: center; gap: 18px; margin-top: 17px; color: var(--muted); font-size: 10px; font-weight: 700; }.legend span { display: flex; align-items: center; gap: 5px; }.legend i { width: 8px; height: 8px; border-radius: 50%; border: 1px solid rgba(38,54,47,0.5); }
+.physical-fridge {
+  width: calc(100% - 14px);
+  margin: 3px auto 0;
+  padding: 8px 8px 13px;
+  border: 2px solid var(--ink);
+  border-radius: 27px 27px 17px 17px;
+  background: #91a79a;
+  box-shadow: inset 0 0 0 3px rgba(255,255,255,0.25), 8px 10px 0 rgba(38,54,47,0.14), 0 20px 35px rgba(38,54,47,0.12);
+  position: relative;
+  isolation: isolate;
+}
+.physical-fridge::after { content: ""; position: absolute; inset: 6px 6px auto; height: 30px; border-radius: 19px 19px 0 0; background: linear-gradient(90deg, rgba(255,255,255,0.24), transparent 30%, rgba(38,54,47,0.08)); pointer-events: none; }
+.fridge-crown { height: 34px; padding: 3px 11px 5px; display: flex; align-items: center; justify-content: space-between; color: rgba(255,255,255,0.8); position: relative; z-index: 1; }
+.fridge-maker { font: 800 8px/1.1 "Arial Rounded MT Bold", sans-serif; letter-spacing: 0.24em; text-shadow: 0 1px rgba(38,54,47,0.3); }
+.power-light { width: 7px; height: 7px; border: 1px solid rgba(38,54,47,0.7); background: #9be488; border-radius: 50%; box-shadow: 0 0 7px rgba(155,228,136,0.85); }
+.fridge-compartment { position: relative; perspective: 1100px; }
+.chilled-compartment { height: 365px; }
+.frozen-compartment { height: 178px; }
+.fridge-interior { position: absolute; inset: 0; overflow: hidden; padding: 12px 11px 10px; border: 2px solid #53695d; border-radius: 15px; background: linear-gradient(145deg, #f5fbf5 0%, #dfe9e1 100%); box-shadow: inset 0 5px 16px rgba(38,54,47,0.17), inset 6px 0 10px rgba(38,54,47,0.08); }
+.frozen-compartment .fridge-interior { background: linear-gradient(145deg, #f7fbfb, #d8e9eb); }
+.interior-heading { height: 30px; display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 3; }
+.interior-heading > span { display: flex; align-items: center; gap: 6px; }
+.interior-heading span i { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: white; color: #5f8b91; font-style: normal; font-size: 10px; box-shadow: 0 2px 5px rgba(38,54,47,0.1); }
+.interior-heading span strong { font: 900 14px/1 "STKaiti", "Kaiti SC", serif; }.interior-heading span small { color: var(--muted); font-size: 8px; font-weight: 700; }
+.interior-heading button { border: 1px solid rgba(38,54,47,0.25); border-radius: 999px; background: rgba(255,255,255,0.78); padding: 5px 8px; color: var(--muted); font-size: 8px; font-weight: 800; cursor: pointer; }
+.interior-light { position: absolute; width: 85px; height: 7px; top: 7px; left: calc(50% - 42px); border-radius: 0 0 8px 8px; background: #fff5bd; box-shadow: 0 4px 18px 8px rgba(255,245,189,0.55); }
+.interior-food-grid { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 6px; margin-top: 10px; }
+.shelf-food { min-height: 85px; padding: 5px 3px 6px; display: grid; justify-items: center; align-content: center; gap: 1px; background: rgba(255,255,255,0.64); border: 1px solid rgba(38,54,47,0.12); border-radius: 13px 12px 11px 14px; position: relative; box-shadow: 0 3px 7px rgba(38,54,47,0.06); }
+.shelf-food::before { content: ""; position: absolute; right: 5px; top: 5px; width: 7px; height: 7px; border-radius: 50%; border: 1px solid rgba(38,54,47,0.55); background: #77b57e; }
+.shelf-food.warning::before { background: var(--yolk); }.shelf-food.danger::before { background: var(--tomato); }
+.shelf-food-emoji { font-size: 28px; line-height: 1.15; filter: drop-shadow(1px 2px 0 rgba(38,54,47,0.08)); }
+.shelf-food strong { font-size: 10px; line-height: 1.2; }.shelf-food small { color: var(--muted); font-size: 7px; }.shelf-food b { margin-top: 3px; padding: 3px 5px; border-radius: 999px; background: var(--mint-soft); color: var(--mint-dark); font-size: 7px; line-height: 1; }
+.shelf-food.warning b { background: #fff3c5; color: #8b6716; }.shelf-food.danger b { background: var(--tomato-soft); color: var(--tomato); }
+.frozen-compartment .interior-food-grid { margin-top: 9px; }.frozen-compartment .shelf-food { min-height: 104px; }.frozen-compartment .shelf-food-emoji { font-size: 35px; }
+.glass-shelves { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.glass-shelves i { position: absolute; left: 9px; right: 9px; height: 4px; border-top: 2px solid rgba(92,127,122,0.32); border-bottom: 1px solid rgba(255,255,255,0.8); box-shadow: 0 3px 4px rgba(38,54,47,0.08); }
+.chilled-compartment .glass-shelves i:nth-child(1) { top: 135px; }.chilled-compartment .glass-shelves i:nth-child(2) { top: 230px; }.chilled-compartment .glass-shelves i:nth-child(3) { top: 326px; }
+.frozen-compartment .glass-shelves i:nth-child(1) { top: 151px; }.frozen-compartment .glass-shelves i:nth-child(2) { display: none; }
+.empty-compartment { position: absolute; inset: 48px 10px 10px; display: grid; place-items: center; align-content: center; color: var(--muted); }.empty-compartment span { font-size: 36px; }.empty-compartment p { margin: 5px 0 0; font-size: 10px; }
+.fridge-door { position: absolute; inset: 0; z-index: 5; overflow: hidden; border: 2px solid var(--ink); border-radius: 15px; padding: 0; background: #c6dfca; box-shadow: inset 8px 0 15px rgba(255,255,255,0.28), inset -6px 0 10px rgba(38,54,47,0.08), 3px 4px 0 rgba(38,54,47,0.2); transform-origin: left center; transform-style: preserve-3d; backface-visibility: hidden; cursor: pointer; transition: transform 0.72s cubic-bezier(.2,.78,.2,1), box-shadow 0.5s ease; }
+.frozen-compartment .fridge-door { background: #dceced; }
+.fridge-compartment.is-open .fridge-door { transform: rotateY(-96deg); box-shadow: 14px 7px 18px rgba(38,54,47,0.17); pointer-events: none; }
+.door-sheen { position: absolute; inset: 0; background: linear-gradient(112deg, rgba(255,255,255,0.34) 0%, transparent 25%, transparent 68%, rgba(38,54,47,0.06) 100%); }
+.door-copy { position: absolute; top: 22px; left: 24px; display: grid; gap: 2px; text-align: left; }
+.door-copy small { color: rgba(38,54,47,0.46); font: 800 7px/1 monospace; letter-spacing: 0.16em; }.door-copy strong { font: 900 28px/1.05 "STKaiti", "Kaiti SC", serif; }.door-copy i { color: rgba(38,54,47,0.62); font-size: 9px; font-style: normal; font-weight: 700; }
+.frozen-compartment .door-copy { top: 28px; }.frozen-compartment .door-copy strong { font-size: 23px; }
+.fridge-handle { position: absolute; right: 15px; top: calc(50% - 54px); width: 17px; height: 108px; border: 1.5px solid var(--ink); border-radius: 10px; background: linear-gradient(90deg, #c9d0cc, #f6f6ef 47%, #9aa59f); box-shadow: 3px 3px 0 rgba(38,54,47,0.25); }
+.fridge-handle i { position: absolute; inset: 8px 4px; border-left: 1px solid rgba(255,255,255,0.8); border-right: 1px solid rgba(38,54,47,0.16); }
+.fridge-handle b { position: absolute; right: 23px; top: calc(50% - 17px); width: 36px; padding: 4px 0; border: 1px solid rgba(38,54,47,0.35); border-radius: 999px; background: rgba(255,253,247,0.78); color: var(--muted); font-size: 7px; font-weight: 800; }
+.frozen-compartment .fridge-handle { top: calc(50% - 33px); height: 66px; }
+.door-magnet { position: absolute; display: grid; place-items: center; width: 58px; height: 58px; border: 5px solid var(--paper); border-radius: 50% 45% 53% 47%; background: rgba(255,255,255,0.7); font-size: 37px; filter: drop-shadow(3px 4px 0 rgba(38,54,47,0.11)); }
+.magnet-tomato { left: 38px; top: 116px; transform: rotate(-8deg); }.magnet-egg { right: 60px; bottom: 50px; width: 48px; height: 52px; font-size: 30px; transform: rotate(8deg); }
+.door-note { position: absolute; left: 118px; top: 150px; min-width: 96px; min-height: 76px; display: grid; align-content: center; justify-items: center; background: #fff5c8; border: 1px solid rgba(38,54,47,0.35); box-shadow: 3px 4px 0 rgba(38,54,47,0.11); transform: rotate(3deg); }
+.door-note::before { content: ""; position: absolute; width: 46px; height: 15px; top: -8px; background: rgba(255,255,255,0.54); transform: rotate(-2deg); }.door-note b { color: var(--tomato); font: 900 25px/1 "Arial Rounded MT Bold", sans-serif; }.door-note small { margin-top: 4px; font: 800 9px/1 "STKaiti", "Kaiti SC", serif; }
+.freezer-snow { position: absolute; left: 123px; bottom: 32px; color: #6d9ba0; font: 900 25px/1 serif; transform: rotate(-4deg); }.freezer-snow i { font-style: normal; font-size: 42px; margin: 0 5px; }
+.fridge-divider { height: 13px; margin: 0 3px; display: grid; place-items: center; background: #758d80; border-left: 2px solid var(--ink); border-right: 2px solid var(--ink); }.fridge-divider span { width: 62%; height: 4px; border-radius: 999px; background: rgba(38,54,47,0.45); box-shadow: 0 1px rgba(255,255,255,0.18); }
+.fridge-feet { position: absolute; left: 28px; right: 28px; bottom: -8px; display: flex; justify-content: space-between; }.fridge-feet i { width: 28px; height: 9px; border: 2px solid var(--ink); border-top: 0; border-radius: 0 0 7px 7px; background: #617568; }
+.fridge-instruction { margin: 20px 0 6px; display: flex; justify-content: center; align-items: center; gap: 7px; color: var(--muted); font-size: 9px; font-weight: 750; text-align: center; }.fridge-instruction span { width: 21px; height: 21px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--paper); color: var(--mint-dark); font-size: 11px; }
+.legend { display: flex; justify-content: center; gap: 18px; margin-top: 12px; color: var(--muted); font-size: 10px; font-weight: 700; }.legend span { display: flex; align-items: center; gap: 5px; }.legend i { width: 8px; height: 8px; border-radius: 50%; border: 1px solid rgba(38,54,47,0.5); }.legend i.safe { background: #77b57e; }.legend i.warning { background: var(--yolk); }.legend i.danger { background: var(--tomato); }
 
 .book-sticker { width: 80px; height: 84px; border: 1.5px solid var(--ink); border-radius: 12px 18px 14px 12px; background: var(--tomato-soft); display: grid; place-items: center; font-size: 42px; position: relative; transform: rotate(4deg); box-shadow: 4px 4px 0 var(--ink); }
 .book-sticker i { position: absolute; bottom: 5px; right: 6px; font: 800 8px/1 monospace; color: var(--tomato); }

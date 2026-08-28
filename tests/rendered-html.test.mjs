@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function render() {
@@ -25,4 +26,13 @@ test("server-renders the fridge decision assistant", async () => {
   assert.match(html, /快速入库/);
   assert.match(html, /购物清单/);
   assert.doesNotMatch(html, /Your site is taking shape|codex-preview/);
+});
+
+test("includes the physical openable fridge interaction", async () => {
+  const source = await readFile(new URL("../app/FridgeDemo.tsx", import.meta.url), "utf8");
+  assert.match(source, /可打开的冰箱/);
+  assert.match(source, /打开.*区，.*样食材/);
+  assert.match(source, /点门板或把手，打开看看/);
+  assert.match(source, /fridge-compartment/);
+  assert.match(source, /aria-expanded=\{open\}/);
 });

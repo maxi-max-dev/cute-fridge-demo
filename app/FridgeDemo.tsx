@@ -97,7 +97,7 @@ function recipeReason(recipe: Recipe, inventory: Ingredient[]) {
 export default function Home() {
   const [tab, setTab] = useState<Tab>("today");
   const [inventory, setInventory] = useState<Ingredient[]>(initialInventory);
-  const [fridgeZone, setFridgeZone] = useState<Storage>("冷藏");
+  const [fridgeZone, setFridgeZone] = useState<Storage | null>(null);
   const [recommendationIndex, setRecommendationIndex] = useState(0);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [shopping, setShopping] = useState<string[]>([]);
@@ -356,33 +356,101 @@ function TodayView({ urgent, readyCount, inventoryCount, recommended, missing, r
   );
 }
 
-function FridgeView({ inventory, zone, setZone, onQuick }: { inventory: Ingredient[]; zone: Storage; setZone: (zone: Storage) => void; onQuick: () => void }) {
-  const visible = inventory.filter((item) => item.storage === zone).sort((a, b) => a.days - b.days);
-  const count = visible.reduce((sum, item) => sum + item.qty, 0);
+function FridgeView({ inventory, zone, setZone, onQuick }: { inventory: Ingredient[]; zone: Storage | null; setZone: (zone: Storage | null) => void; onQuick: () => void }) {
+  const chilled = inventory.filter((item) => item.storage === "冷藏").sort((a, b) => a.days - b.days);
+  const frozen = inventory.filter((item) => item.storage === "冷冻").sort((a, b) => a.days - b.days);
+  const totalCount = inventory.reduce((sum, item) => sum + item.qty, 0);
+
+  function toggleZone(next: Storage) {
+    setZone(zone === next ? null : next);
+  }
+
   return (
     <div className="view fridge-view">
-      <div className="view-intro"><div><p className="eyebrow">家里现有</p><h1>我的冰箱</h1><p>{count} 件食材，按到期顺序排好了。</p></div><button className="mini-add" onClick={onQuick}>＋ 快速入库</button></div>
-      <div className="zone-tabs" role="tablist" aria-label="冰箱分区">
-        {(["冷藏", "冷冻"] as Storage[]).map((item) => <button key={item} role="tab" aria-selected={zone === item} className={zone === item ? "active" : ""} onClick={() => setZone(item)}><span>{item === "冷藏" ? "❄" : "✣"}</span>{item}区 <b>{inventory.filter((food) => food.storage === item).length}</b></button>)}
+      <div className="view-intro"><div><p className="eyebrow">家里现有</p><h1>我的冰箱</h1><p>{totalCount} 件食材。拉开门，看看今天先吃什么。</p></div><button className="mini-add" onClick={onQuick}>＋ 快速入库</button></div>
+
+      <div className={`physical-fridge ${zone ? "door-is-open" : ""}`} aria-label="可打开的冰箱">
+        <div className="fridge-crown">
+          <span className="fridge-maker">MORI</span>
+          <i className="power-light" />
+        </div>
+
+        <FridgeCompartment
+          storage="冷藏"
+          items={chilled}
+          open={zone === "冷藏"}
+          onToggle={() => toggleZone("冷藏")}
+        />
+
+        <div className="fridge-divider"><span /></div>
+
+        <FridgeCompartment
+          storage="冷冻"
+          items={frozen}
+          open={zone === "冷冻"}
+          onToggle={() => toggleZone("冷冻")}
+        />
+
+        <div className="fridge-feet"><i /><i /></div>
       </div>
-      <section className={`fridge-cabinet ${zone === "冷冻" ? "frozen" : ""}`}>
-        <div className="cabinet-label"><span>{zone === "冷藏" ? "日常冷藏" : "长期冷冻"}</span><small>越靠前越该先吃</small></div>
-        <div className="food-grid">
-          {visible.map((item) => {
+
+      <p className="fridge-instruction">
+        <span>{zone ? "↩" : "☝"}</span>
+        {zone ? `${zone}门已打开，点“关门”或拉开另一扇门` : "点门板或把手，打开看看"}
+      </p>
+      <div className="legend"><span><i className="safe" />新鲜</span><span><i className="warning" />尽快吃</span><span><i className="danger" />快过期</span></div>
+    </div>
+  );
+}
+
+function FridgeCompartment({ storage, items, open, onToggle }: { storage: Storage; items: Ingredient[]; open: boolean; onToggle: () => void }) {
+  const urgentCount = items.filter((item) => item.days <= 3).length;
+  const isChilled = storage === "冷藏";
+
+  return (
+    <section className={`fridge-compartment ${isChilled ? "chilled-compartment" : "frozen-compartment"} ${open ? "is-open" : ""}`} aria-label={`${storage}区`}>
+      <div className="fridge-interior">
+        <div className="interior-heading">
+          <span><i>{isChilled ? "❄" : "✣"}</i><strong>{storage}区</strong><small>{items.length} 样</small></span>
+          <button onClick={onToggle} aria-label={`关闭${storage}区`}>关门 ×</button>
+        </div>
+        {isChilled && <span className="interior-light" />}
+        <div className="interior-food-grid">
+          {items.map((item) => {
             const status = inventoryStatus(item.days);
             return (
-              <article className={`food-card ${status.tone}`} key={item.id}>
-                <div className="food-top"><span className="food-emoji">{item.emoji}</span><span className={`status-dot ${status.tone}`} /></div>
-                <h3>{item.name}</h3><p>{item.qty}{item.unit} · {item.addedAt}</p>
-                <strong className="days-label">{status.label}</strong>
+              <article className={`shelf-food ${status.tone}`} key={item.id}>
+                <span className="shelf-food-emoji">{item.emoji}</span>
+                <strong>{item.name}</strong>
+                <small>{item.qty}{item.unit}</small>
+                <b>{status.label}</b>
               </article>
             );
           })}
         </div>
-        <div className="shelf-line"><span /><i /><i /><span /></div>
-      </section>
-      <div className="legend"><span><i className="safe" />新鲜</span><span><i className="warning" />尽快吃</span><span><i className="danger" />快过期</span></div>
-    </div>
+        <div className="glass-shelves"><i /><i />{isChilled && <i />}</div>
+        {!items.length && <div className="empty-compartment"><span>🧊</span><p>这里空出来了</p></div>}
+      </div>
+
+      <button className="fridge-door" onClick={onToggle} aria-expanded={open} aria-label={`${open ? "关闭" : "打开"}${storage}区，${items.length}样食材`}>
+        <span className="door-sheen" />
+        <span className="door-copy">
+          <small>{isChilled ? "FRESH" : "FREEZER"}</small>
+          <strong>{storage}区</strong>
+          <i>{items.length} 样食材</i>
+        </span>
+        {isChilled ? (
+          <>
+            <span className="door-magnet magnet-tomato">🍅</span>
+            <span className="door-magnet magnet-egg">🥚</span>
+            <span className="door-note"><b>{urgentCount || "✓"}</b><small>{urgentCount ? "样要先吃" : "状态很好"}</small></span>
+          </>
+        ) : (
+          <span className="freezer-snow">✦ <i>❄</i> ·</span>
+        )}
+        <span className="fridge-handle"><i /><b>拉开</b></span>
+      </button>
+    </section>
   );
 }
 
