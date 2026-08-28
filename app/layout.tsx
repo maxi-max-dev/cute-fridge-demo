@@ -1,32 +1,30 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import "./globals.css";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  const base = new URL(`${protocol}://${host}`);
+export const dynamic = "force-static";
 
-  return {
-    metadataBase: base,
-    title: "冰箱今天吃什么｜冰箱决策助手",
-    description: "看看冰箱里有什么、什么快过期、今晚能做什么。",
-    icons: { icon: "/favicon.png", shortcut: "/favicon.png" },
-    openGraph: {
-      title: "冰箱今天吃什么",
-      description: "先吃快过期的，今晚不再猜。",
-      type: "website",
-      images: [{ url: new URL("/og.png", base), width: 1200, height: 630, alt: "冰箱今天吃什么" }],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: "冰箱今天吃什么",
-      description: "先吃快过期的，今晚不再猜。",
-      images: [new URL("/og.png", base)],
-    },
-  };
-}
+const isGitHubPages = process.env.GITHUB_PAGES === "true";
+const basePath = isGitHubPages ? "/cute-fridge-demo" : "";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://bingxiang-jintian-chi-shenme.maxorila.chatgpt.site";
+
+export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
+  title: "冰箱今天吃什么｜冰箱决策助手",
+  description: "看看冰箱里有什么、什么快过期、今晚能做什么。",
+  icons: { icon: `${basePath}/favicon.png`, shortcut: `${basePath}/favicon.png` },
+  openGraph: {
+    title: "冰箱今天吃什么",
+    description: "先吃快过期的，今晚不再猜。",
+    type: "website",
+    images: [{ url: `${basePath}/og.png`, width: 1200, height: 630, alt: "冰箱今天吃什么" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "冰箱今天吃什么",
+    description: "先吃快过期的，今晚不再猜。",
+    images: [`${basePath}/og.png`],
+  },
+};
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="zh-CN"><body>{children}</body></html>;
