@@ -1,6 +1,7 @@
 "use client";
 
-import { type ChangeEvent, type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 
 type Storage = "冷藏" | "冷冻";
 type Tab = "today" | "fridge" | "recipes" | "shopping";
@@ -38,6 +39,13 @@ type Recipe = {
   main: string[];
   steps: string[];
   color: string;
+};
+
+type WeatherNow = {
+  location: string;
+  temperature: number | null;
+  code: number | null;
+  status: "loading" | "live" | "fallback";
 };
 
 const initialInventory: Ingredient[] = [
@@ -157,6 +165,37 @@ function recipeReason(recipe: Recipe, inventory: Ingredient[]) {
   return `主料齐全，只需补 ${missing.length} 样`;
 }
 
+function weatherIcon(code: number | null) {
+  if (code === null) return "⌁";
+  if (code === 0) return "☀️";
+  if (code <= 3) return "⛅";
+  if (code === 45 || code === 48) return "🌫️";
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return "🌧️";
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "🌨️";
+  if (code >= 95) return "⛈️";
+  return "🌤️";
+}
+
+function localizeCity(city: string) {
+  const names: Record<string, string> = {
+    Beijing: "北京", Shanghai: "上海", Guangzhou: "广州", Shenzhen: "深圳", Hangzhou: "杭州",
+    Chengdu: "成都", Chongqing: "重庆", Wuhan: "武汉", Nanjing: "南京", Suzhou: "苏州",
+    Xiamen: "厦门", Qingdao: "青岛", Tianjin: "天津", Zhengzhou: "郑州", Changsha: "长沙",
+    Shenyang: "沈阳", "Xi'an": "西安", "Hong Kong": "香港", Macao: "澳门", Macau: "澳门",
+    Brisbane: "布里斯班", Sydney: "悉尼", Melbourne: "墨尔本", Singapore: "新加坡",
+  };
+  return names[city] ?? city;
+}
+
+function ClientPortal({ children }: { children: ReactNode }) {
+  const ready = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
+  return ready ? createPortal(children, document.body) : null;
+}
+
 export default function Home() {
   const [tab, setTab] = useState<Tab>("today");
   const [inventory, setInventory] = useState<Ingredient[]>(initialInventory);
@@ -177,12 +216,70 @@ export default function Home() {
   const [quickStorage, setQuickStorage] = useState<Storage>("冷藏");
   const [quickDays, setQuickDays] = useState(quickItems[0].chilled);
   const [addedCount, setAddedCount] = useState(0);
+  const [weather, setWeather] = useState<WeatherNow>({ location: "定位天气中", temperature: null, code: null, status: "loading" });
 
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(""), 2200);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 8000);
+    let mounted = true;
+
+    async function loadWeather() {
+      try {
+        const cached = window.sessionStorage.getItem("fridge-weather-v1");
+        if (cached) {
+          const parsed = JSON.parse(cached) as WeatherNow & { cachedAt: number };
+          if (Date.now() - parsed.cachedAt < 30 * 60 * 1000) {
+            if (mounted) setWeather({ location: parsed.location, temperature: parsed.temperature, code: parsed.code, status: "live" });
+            return;
+          }
+        }
+
+        const locationResponse = await fetch("https://ipwho.is/", { signal: controller.signal });
+        if (!locationResponse.ok) throw new Error("location unavailable");
+        const location = await locationResponse.json() as {
+          success?: boolean; city?: string; region?: string; country?: string; latitude?: number; longitude?: number;
+        };
+        if (!location.success || !Number.isFinite(location.latitude) || !Number.isFinite(location.longitude)) throw new Error("location invalid");
+
+        const weatherUrl = new URL("https://api.open-meteo.com/v1/forecast");
+        weatherUrl.searchParams.set("latitude", String(location.latitude));
+        weatherUrl.searchParams.set("longitude", String(location.longitude));
+        weatherUrl.searchParams.set("current", "temperature_2m,weather_code");
+        weatherUrl.searchParams.set("timezone", "auto");
+        const weatherResponse = await fetch(weatherUrl, { signal: controller.signal });
+        if (!weatherResponse.ok) throw new Error("weather unavailable");
+        const forecast = await weatherResponse.json() as { current?: { temperature_2m?: number; weather_code?: number } };
+        if (!Number.isFinite(forecast.current?.temperature_2m)) throw new Error("weather invalid");
+
+        const next: WeatherNow & { cachedAt: number } = {
+          location: localizeCity(location.city || location.region || location.country || "当前位置"),
+          temperature: Math.round(forecast.current!.temperature_2m!),
+          code: Number.isFinite(forecast.current?.weather_code) ? forecast.current!.weather_code! : null,
+          status: "live",
+          cachedAt: Date.now(),
+        };
+        if (mounted) setWeather(next);
+        window.sessionStorage.setItem("fridge-weather-v1", JSON.stringify(next));
+      } catch {
+        if (mounted) setWeather({ location: "天气待更新", temperature: null, code: null, status: "fallback" });
+      } finally {
+        window.clearTimeout(timeout);
+      }
+    }
+
+    void loadWeather();
+    return () => {
+      mounted = false;
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, []);
 
   const rankedRecipes = useMemo(
     () => [...recipes].sort((a, b) => scoreRecipe(b, inventory) - scoreRecipe(a, inventory)),
@@ -340,6 +437,7 @@ export default function Home() {
               recommended={recommended}
               missing={missingFor(recommended, inventory)}
               reason={recipeReason(recommended, inventory)}
+              weather={weather}
               onSwap={() => { setRecommendationIndex((index) => (index + 1) % rankedRecipes.length); showToast("换好啦，按临期与缺料重新挑选"); }}
               onOpen={() => openRecipe(recommended)}
               onFridge={() => navigate("fridge")}
@@ -431,13 +529,18 @@ export default function Home() {
   );
 }
 
-function TodayView({ urgent, readyCount, inventoryCount, recommended, missing, reason, onSwap, onOpen, onFridge, onRecipes }: {
-  urgent: Ingredient[]; readyCount: number; inventoryCount: number; recommended: Recipe; missing: string[]; reason: string;
+function TodayView({ urgent, readyCount, inventoryCount, recommended, missing, reason, weather, onSwap, onOpen, onFridge, onRecipes }: {
+  urgent: Ingredient[]; readyCount: number; inventoryCount: number; recommended: Recipe; missing: string[]; reason: string; weather: WeatherNow;
   onSwap: () => void; onOpen: () => void; onFridge: () => void; onRecipes: () => void;
 }) {
   return (
     <div className="view today-view">
-      <div className="date-line"><span>8月28日 · 周五</span><span className="weather">布里斯班 22°</span></div>
+      <div className="date-line">
+        <span>8月28日 · 周五</span>
+        <span className={`weather ${weather.status}`} title={weather.status === "live" ? "根据当前网络 IP 粗定位，可能受 VPN 影响" : "天气接口不可用时稍后会自动重试"}>
+          <i>{weatherIcon(weather.code)}</i>{weather.location}{weather.temperature === null ? "" : ` ${weather.temperature}°`}
+        </span>
+      </div>
       <section className="greeting">
         <div>
           <p className="eyebrow">晚饭不用猜</p>
@@ -586,15 +689,19 @@ function FridgeView({ inventory, zone, setZone, onQuick, onDiscard }: { inventor
       </p>
       <div className="legend"><span><i className="safe" />新鲜</span><span><i className="warning" />尽快吃</span><span><i className="danger" />快过期</span><span><i className="expired" />已过期</span></div>
 
-      <div ref={trashCorner} className={`corner-trash ${draggingItem ? "drag-ready" : ""} ${overTrash ? "drop-hot" : ""}`} aria-live="polite">
-        <span>🗑️</span><strong>{overTrash ? "松手丢掉" : draggingItem ? "拖到这里" : "拖来丢掉"}</strong>
-      </div>
-      {draggingItem && (
-        <div className={`food-drag-ghost ${overTrash ? "over-trash" : ""}`} style={{ left: dragPoint.x, top: dragPoint.y }} aria-hidden="true">
-          <FoodVisual item={draggingItem} className="drag-ghost-visual" />
-          <strong>{draggingItem.name}</strong><small>{inventoryStatus(draggingItem.days).label}</small>
-        </div>
-      )}
+      <ClientPortal>
+        <>
+          <div ref={trashCorner} className={`corner-trash ${draggingItem ? "drag-ready" : ""} ${overTrash ? "drop-hot" : ""}`} aria-live="polite">
+            <span>🗑️</span><strong>{overTrash ? "松手丢掉" : draggingItem ? "拖到这里" : "拖来丢掉"}</strong>
+          </div>
+          {draggingItem && (
+            <div className={`food-drag-ghost ${overTrash ? "over-trash" : ""}`} style={{ left: dragPoint.x, top: dragPoint.y }} aria-hidden="true">
+              <FoodVisual item={draggingItem} className="drag-ghost-visual" />
+              <strong>{draggingItem.name}</strong><small>{inventoryStatus(draggingItem.days).label}</small>
+            </div>
+          )}
+        </>
+      </ClientPortal>
     </div>
   );
 }
@@ -655,39 +762,60 @@ function SwipeFoodCard({ item, status, onDiscard, dragging, onDragStart, onDragM
 }) {
   const [offsetX, setOffsetX] = useState(0);
   const gesture = useRef<{ x: number; y: number; mode: "pending" | "swipe" | "drag" } | null>(null);
+  const removeWindowListeners = useRef<() => void>(() => undefined);
+
+  useEffect(() => () => removeWindowListeners.current(), []);
 
   function startGesture(event: ReactPointerEvent<HTMLElement>) {
+    if (event.button !== 0) return;
+    removeWindowListeners.current();
     gesture.current = { x: event.clientX, y: event.clientY, mode: "pending" };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
+    const pointerId = event.pointerId;
 
-  function moveGesture(event: ReactPointerEvent<HTMLElement>) {
-    const active = gesture.current;
-    if (!active) return;
-    const x = event.clientX - active.x;
-    const y = event.clientY - active.y;
-    if (active.mode === "pending" && Math.hypot(x, y) >= 10) {
-      active.mode = x < -8 && Math.abs(x) > Math.abs(y) * 1.2 ? "swipe" : "drag";
-      if (active.mode === "drag") onDragStart(item, event.clientX, event.clientY);
-    }
-    if (active.mode === "swipe") setOffsetX(Math.max(-82, x));
-    if (active.mode === "drag") onDragMove(event.clientX, event.clientY);
-  }
+    const moveGesture = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      const active = gesture.current;
+      if (!active) return;
+      const x = moveEvent.clientX - active.x;
+      const y = moveEvent.clientY - active.y;
+      if (active.mode === "pending" && Math.hypot(x, y) >= 8) {
+        active.mode = x < -8 && Math.abs(x) > Math.abs(y) * 1.25 ? "swipe" : "drag";
+        if (active.mode === "drag") onDragStart(item, moveEvent.clientX, moveEvent.clientY);
+      }
+      if (active.mode !== "pending") moveEvent.preventDefault();
+      if (active.mode === "swipe") setOffsetX(Math.max(-82, Math.min(0, x)));
+      if (active.mode === "drag") onDragMove(moveEvent.clientX, moveEvent.clientY);
+    };
 
-  function endGesture(event: ReactPointerEvent<HTMLElement>) {
-    const active = gesture.current;
-    if (!active) return;
-    const distance = event.clientX - active.x;
-    if (active.mode === "swipe" && distance < -58) onDiscard(item.id);
-    if (active.mode === "drag") onDragEnd(item, event.clientX, event.clientY);
-    gesture.current = null;
-    setOffsetX(0);
-  }
+    const endGesture = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== pointerId) return;
+      const active = gesture.current;
+      removeWindowListeners.current();
+      if (!active) return;
+      const distance = upEvent.clientX - active.x;
+      if (active.mode === "swipe" && distance < -58) onDiscard(item.id);
+      if (active.mode === "drag") onDragEnd(item, upEvent.clientX, upEvent.clientY);
+      gesture.current = null;
+      setOffsetX(0);
+    };
 
-  function cancelGesture() {
-    if (gesture.current?.mode === "drag") onDragCancel();
-    gesture.current = null;
-    setOffsetX(0);
+    const cancelGesture = (cancelEvent: PointerEvent) => {
+      if (cancelEvent.pointerId !== pointerId) return;
+      removeWindowListeners.current();
+      if (gesture.current?.mode === "drag") onDragCancel();
+      gesture.current = null;
+      setOffsetX(0);
+    };
+
+    window.addEventListener("pointermove", moveGesture, { passive: false });
+    window.addEventListener("pointerup", endGesture);
+    window.addEventListener("pointercancel", cancelGesture);
+    removeWindowListeners.current = () => {
+      window.removeEventListener("pointermove", moveGesture);
+      window.removeEventListener("pointerup", endGesture);
+      window.removeEventListener("pointercancel", cancelGesture);
+      removeWindowListeners.current = () => undefined;
+    };
   }
 
   return (
@@ -696,10 +824,8 @@ function SwipeFoodCard({ item, status, onDiscard, dragging, onDragStart, onDragM
       <article
         className={`shelf-food ${status.tone}`}
         style={{ transform: `translateX(${offsetX}px)` }}
+        aria-label={`拖动${item.name}到右下角垃圾桶，或向左滑动丢掉`}
         onPointerDown={startGesture}
-        onPointerMove={moveGesture}
-        onPointerUp={endGesture}
-        onPointerCancel={cancelGesture}
       >
         <FoodVisual item={item} className="shelf-food-emoji" />
         <strong>{item.name}</strong>
@@ -773,7 +899,8 @@ function ShoppingView({ shopping, setShopping, onRecipes }: { shopping: string[]
 function RecipeSheet({ recipe, inventory, onClose, onAdd, onCook }: { recipe: Recipe; inventory: Ingredient[]; onClose: () => void; onAdd: (items: string[]) => void; onCook: () => void }) {
   const missing = missingFor(recipe, inventory);
   return (
-    <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className="overlay">
+      <button className="overlay-dismiss" onClick={onClose} aria-label="关闭菜谱详情" />
       <section className="sheet recipe-sheet" role="dialog" aria-modal="true" aria-labelledby="recipe-title">
         <div className="sheet-handle" />
         <button className="close-button" onClick={onClose} aria-label="关闭">×</button>
@@ -824,7 +951,8 @@ function QuickAddSheet({ category, choice, customMode, customName, customEmoji, 
   const expiryText = `${expiry.getMonth() + 1}月${expiry.getDate()}日`;
   const categoryItems = quickItems.filter((item) => item.category === category);
   return (
-    <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className="overlay">
+      <button className="overlay-dismiss" onClick={onClose} aria-label="关闭快速入库" />
       <section className="sheet quick-sheet" role="dialog" aria-modal="true" aria-labelledby="quick-title">
         <div className="sheet-handle" /><button className="close-button" onClick={onClose} aria-label="关闭">×</button>
         <p className="eyebrow">一步一步来</p><h2 id="quick-title">这次买了什么？</h2><p className="sheet-lead">按类别找到食材，也可以自己输入；加入后还能继续记。</p>
@@ -845,7 +973,7 @@ function QuickAddSheet({ category, choice, customMode, customName, customEmoji, 
           <div className="custom-composer">
             <label className="custom-name">
               <span>食材名称</span>
-              <input autoFocus maxLength={12} value={customName} onChange={(event) => onCustomName(event.target.value)} placeholder="例如：茼蒿、腊肠" aria-label="自定义食材名称" />
+              <input maxLength={12} value={customName} onChange={(event) => onCustomName(event.target.value)} placeholder="例如：茼蒿、腊肠" aria-label="自定义食材名称" />
             </label>
             <div className="custom-visual-heading"><span>选一个图案</span><small>也可以直接拍下它</small></div>
             <div className="custom-visual-row">

@@ -64,10 +64,21 @@ test("supports dragging a whole food card into the bottom-right trash corner", a
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   assert.match(source, /corner-trash/);
   assert.match(source, /food-drag-ghost/);
+  assert.match(source, /createPortal/);
   assert.match(source, /拖动整张卡片到右下角/);
   assert.match(source, /isOverTrash/);
-  assert.match(source, /onDragEnd\(item, event\.clientX, event\.clientY\)/);
+  assert.match(source, /window\.addEventListener\("pointermove"/);
+  assert.match(source, /onDragEnd\(item, upEvent\.clientX, upEvent\.clientY\)/);
   assert.match(styles, /\.corner-trash/);
   assert.match(styles, /position: fixed/);
   assert.match(styles, /\.corner-trash\.drop-hot/);
+});
+
+test("loads current weather from IP geolocation with a visible fallback", async () => {
+  const source = await readFile(new URL("../app/FridgeDemo.tsx", import.meta.url), "utf8");
+  assert.match(source, /https:\/\/ipwho\.is\//);
+  assert.match(source, /https:\/\/api\.open-meteo\.com\/v1\/forecast/);
+  assert.match(source, /current.*temperature_2m,weather_code/);
+  assert.match(source, /根据当前网络 IP 粗定位/);
+  assert.match(source, /天气待更新/);
 });
