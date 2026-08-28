@@ -4,6 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 
 type Storage = "冷藏" | "冷冻";
 type Tab = "today" | "fridge" | "recipes" | "shopping";
+type FoodCategory = "蔬菜" | "肉禽" | "蛋奶" | "水产" | "豆制品" | "主食速冻";
+
+type QuickItem = {
+  category: FoodCategory;
+  name: string;
+  emoji: string;
+  unit: string;
+  chilled: number;
+  frozen: number;
+};
 
 type Ingredient = {
   id: number;
@@ -50,13 +60,50 @@ const recipes: Recipe[] = [
   { id: 6, name: "酸奶水果碗", emoji: "🥣", time: 5, difficulty: "简单", ingredients: ["酸奶", "香蕉"], main: ["酸奶"], steps: ["酸奶倒入碗中", "香蕉切片铺在表面", "有坚果的话可以撒一小把"], color: "#E7E6FA" },
 ];
 
-const quickItems = [
-  { name: "番茄", emoji: "🍅", unit: "个", chilled: 5, frozen: 30 },
-  { name: "鸡蛋", emoji: "🥚", unit: "枚", chilled: 14, frozen: 30 },
-  { name: "青菜", emoji: "🥬", unit: "把", chilled: 3, frozen: 14 },
-  { name: "牛肉", emoji: "🥩", unit: "份", chilled: 2, frozen: 30 },
-  { name: "豆腐", emoji: "◻️", unit: "盒", chilled: 5, frozen: 20 },
-  { name: "蘑菇", emoji: "🍄", unit: "盒", chilled: 5, frozen: 21 },
+const foodCategories: { id: FoodCategory; emoji: string; hint: string }[] = [
+  { id: "蔬菜", emoji: "🥬", hint: "叶菜瓜果" },
+  { id: "肉禽", emoji: "🥩", hint: "猪牛鸡鸭" },
+  { id: "蛋奶", emoji: "🥚", hint: "蛋与奶" },
+  { id: "水产", emoji: "🐟", hint: "鱼虾贝" },
+  { id: "豆制品", emoji: "🫘", hint: "豆腐豆干" },
+  { id: "主食速冻", emoji: "🥟", hint: "米面点心" },
+];
+
+const quickItems: QuickItem[] = [
+  { category: "蔬菜", name: "青菜", emoji: "🥬", unit: "把", chilled: 3, frozen: 14 },
+  { category: "蔬菜", name: "番茄", emoji: "🍅", unit: "个", chilled: 5, frozen: 30 },
+  { category: "蔬菜", name: "土豆", emoji: "🥔", unit: "个", chilled: 14, frozen: 60 },
+  { category: "蔬菜", name: "胡萝卜", emoji: "🥕", unit: "根", chilled: 10, frozen: 45 },
+  { category: "蔬菜", name: "黄瓜", emoji: "🥒", unit: "根", chilled: 5, frozen: 21 },
+  { category: "蔬菜", name: "茄子", emoji: "🍆", unit: "根", chilled: 4, frozen: 21 },
+  { category: "蔬菜", name: "青椒", emoji: "🫑", unit: "个", chilled: 6, frozen: 30 },
+  { category: "蔬菜", name: "蘑菇", emoji: "🍄", unit: "盒", chilled: 5, frozen: 21 },
+  { category: "肉禽", name: "猪肉", emoji: "🥩", unit: "份", chilled: 2, frozen: 30 },
+  { category: "肉禽", name: "牛肉", emoji: "🥩", unit: "份", chilled: 2, frozen: 30 },
+  { category: "肉禽", name: "鸡胸", emoji: "🍗", unit: "份", chilled: 2, frozen: 30 },
+  { category: "肉禽", name: "鸡腿", emoji: "🍗", unit: "只", chilled: 2, frozen: 30 },
+  { category: "肉禽", name: "排骨", emoji: "🍖", unit: "份", chilled: 2, frozen: 30 },
+  { category: "肉禽", name: "五花肉", emoji: "🥓", unit: "份", chilled: 2, frozen: 30 },
+  { category: "蛋奶", name: "鸡蛋", emoji: "🥚", unit: "枚", chilled: 14, frozen: 30 },
+  { category: "蛋奶", name: "鸭蛋", emoji: "🥚", unit: "枚", chilled: 14, frozen: 30 },
+  { category: "蛋奶", name: "牛奶", emoji: "🥛", unit: "盒", chilled: 7, frozen: 30 },
+  { category: "蛋奶", name: "酸奶", emoji: "🥛", unit: "杯", chilled: 7, frozen: 30 },
+  { category: "蛋奶", name: "奶酪", emoji: "🧀", unit: "盒", chilled: 14, frozen: 60 },
+  { category: "水产", name: "鲜虾", emoji: "🦐", unit: "份", chilled: 1, frozen: 30 },
+  { category: "水产", name: "虾仁", emoji: "🍤", unit: "袋", chilled: 1, frozen: 30 },
+  { category: "水产", name: "鱼", emoji: "🐟", unit: "条", chilled: 1, frozen: 30 },
+  { category: "水产", name: "三文鱼", emoji: "🍣", unit: "份", chilled: 1, frozen: 30 },
+  { category: "水产", name: "贝类", emoji: "🐚", unit: "份", chilled: 1, frozen: 21 },
+  { category: "豆制品", name: "豆腐", emoji: "◻️", unit: "盒", chilled: 5, frozen: 20 },
+  { category: "豆制品", name: "豆干", emoji: "🫘", unit: "袋", chilled: 7, frozen: 30 },
+  { category: "豆制品", name: "腐竹", emoji: "🫘", unit: "袋", chilled: 30, frozen: 90 },
+  { category: "豆制品", name: "豆浆", emoji: "🥛", unit: "瓶", chilled: 2, frozen: 14 },
+  { category: "主食速冻", name: "米饭", emoji: "🍚", unit: "份", chilled: 2, frozen: 14 },
+  { category: "主食速冻", name: "面条", emoji: "🍜", unit: "份", chilled: 3, frozen: 30 },
+  { category: "主食速冻", name: "馒头", emoji: "🍞", unit: "袋", chilled: 3, frozen: 30 },
+  { category: "主食速冻", name: "水饺", emoji: "🥟", unit: "袋", chilled: 3, frozen: 60 },
+  { category: "主食速冻", name: "包子", emoji: "🥟", unit: "袋", chilled: 3, frozen: 45 },
+  { category: "主食速冻", name: "馄饨", emoji: "🥣", unit: "袋", chilled: 3, frozen: 60 },
 ];
 
 const tabLabels: Record<Tab, string> = {
@@ -105,7 +152,10 @@ export default function Home() {
   const [completionOpen, setCompletionOpen] = useState(false);
   const [consumed, setConsumed] = useState<string[]>([]);
   const [toast, setToast] = useState("");
+  const [quickCategory, setQuickCategory] = useState<FoodCategory>("蔬菜");
   const [quickChoice, setQuickChoice] = useState(quickItems[0]);
+  const [quickCustomMode, setQuickCustomMode] = useState(false);
+  const [quickCustomName, setQuickCustomName] = useState("");
   const [quickStorage, setQuickStorage] = useState<Storage>("冷藏");
   const [quickDays, setQuickDays] = useState(quickItems[0].chilled);
   const [addedCount, setAddedCount] = useState(0);
@@ -163,26 +213,49 @@ export default function Home() {
     showToast("库存已更新，开饭啦！");
   }
 
-  function chooseQuick(item: typeof quickItems[number]) {
+  const resolvedQuickChoice: QuickItem = quickCustomMode
+    ? { category: quickCategory, name: quickCustomName.trim(), emoji: "🧺", unit: "份", chilled: 5, frozen: 30 }
+    : quickChoice;
+
+  function chooseQuick(item: QuickItem) {
     setQuickChoice(item);
+    setQuickCustomMode(false);
     setQuickDays(quickStorage === "冷藏" ? item.chilled : item.frozen);
+  }
+
+  function changeQuickCategory(category: FoodCategory) {
+    const firstItem = quickItems.find((item) => item.category === category)!;
+    setQuickCategory(category);
+    setQuickChoice(firstItem);
+    setQuickCustomMode(false);
+    setQuickCustomName("");
+    setQuickDays(quickStorage === "冷藏" ? firstItem.chilled : firstItem.frozen);
+  }
+
+  function enableCustomQuick() {
+    setQuickCustomMode(true);
+    setQuickCustomName("");
+    setQuickDays(quickStorage === "冷藏" ? 5 : 30);
   }
 
   function changeStorage(storage: Storage) {
     setQuickStorage(storage);
-    setQuickDays(storage === "冷藏" ? quickChoice.chilled : quickChoice.frozen);
+    setQuickDays(storage === "冷藏" ? resolvedQuickChoice.chilled : resolvedQuickChoice.frozen);
   }
 
   function addQuickItem() {
+    const item = resolvedQuickChoice;
+    if (!item.name) return;
     const now = new Date();
     const time = `今天 ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     setInventory((current) => {
-      const same = current.find((item) => item.name === quickChoice.name && item.storage === quickStorage);
-      if (same) return current.map((item) => item.id === same.id ? { ...item, qty: item.qty + 1, days: quickDays, addedAt: time } : item);
-      return [...current, { id: Date.now(), name: quickChoice.name, emoji: quickChoice.emoji, qty: 1, unit: quickChoice.unit, days: quickDays, storage: quickStorage, addedAt: time }];
+      const same = current.find((food) => food.name === item.name && food.storage === quickStorage);
+      if (same) return current.map((food) => food.id === same.id ? { ...food, qty: food.qty + 1, days: quickDays, addedAt: time } : food);
+      return [...current, { id: Date.now(), name: item.name, emoji: item.emoji, qty: 1, unit: item.unit, days: quickDays, storage: quickStorage, addedAt: time }];
     });
     setAddedCount((count) => count + 1);
-    showToast(`${quickChoice.name}已放进${quickStorage}区`);
+    showToast(`${item.name}已放进${quickStorage}区`);
+    if (quickCustomMode) setQuickCustomName("");
   }
 
   function navigate(next: Tab) {
@@ -278,11 +351,17 @@ export default function Home() {
 
       {quickOpen && (
         <QuickAddSheet
-          choice={quickChoice}
+          category={quickCategory}
+          choice={resolvedQuickChoice}
+          customMode={quickCustomMode}
+          customName={quickCustomName}
           storage={quickStorage}
           days={quickDays}
           addedCount={addedCount}
+          onCategory={changeQuickCategory}
           onChoose={chooseQuick}
+          onCustom={enableCustomQuick}
+          onCustomName={setQuickCustomName}
           onStorage={changeStorage}
           onDays={setQuickDays}
           onAdd={addQuickItem}
@@ -553,29 +632,48 @@ function CompletionSheet({ recipe, inventory, consumed, setConsumed, onClose, on
   );
 }
 
-function QuickAddSheet({ choice, storage, days, addedCount, onChoose, onStorage, onDays, onAdd, onClose }: {
-  choice: typeof quickItems[number]; storage: Storage; days: number; addedCount: number;
-  onChoose: (item: typeof quickItems[number]) => void; onStorage: (storage: Storage) => void; onDays: (days: number) => void; onAdd: () => void; onClose: () => void;
+function QuickAddSheet({ category, choice, customMode, customName, storage, days, addedCount, onCategory, onChoose, onCustom, onCustomName, onStorage, onDays, onAdd, onClose }: {
+  category: FoodCategory; choice: QuickItem; customMode: boolean; customName: string; storage: Storage; days: number; addedCount: number;
+  onCategory: (category: FoodCategory) => void; onChoose: (item: QuickItem) => void; onCustom: () => void; onCustomName: (name: string) => void;
+  onStorage: (storage: Storage) => void; onDays: (days: number) => void; onAdd: () => void; onClose: () => void;
 }) {
   const expiry = new Date(); expiry.setDate(expiry.getDate() + days);
   const expiryText = `${expiry.getMonth() + 1}月${expiry.getDate()}日`;
+  const categoryItems = quickItems.filter((item) => item.category === category);
   return (
     <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="sheet quick-sheet" role="dialog" aria-modal="true" aria-labelledby="quick-title">
         <div className="sheet-handle" /><button className="close-button" onClick={onClose} aria-label="关闭">×</button>
-        <p className="eyebrow">不用填表</p><h2 id="quick-title">快速放进冰箱</h2><p className="sheet-lead">现在入库 · 可连续添加，默认日期随分区自动估算。</p>
-        <div className="quick-grid">
-          {quickItems.map((item) => <button key={item.name} className={choice.name === item.name ? "active" : ""} onClick={() => onChoose(item)}><span>{item.emoji}</span><b>{item.name}</b>{choice.name === item.name && <i>✓</i>}</button>)}
+        <p className="eyebrow">一步一步来</p><h2 id="quick-title">这次买了什么？</h2><p className="sheet-lead">按类别找到食材，也可以自己输入；加入后还能继续记。</p>
+        <div className="field-label step-label"><span><b>1</b> 先选食材类别</span><small>按中国家庭常用食材整理</small></div>
+        <div className="category-grid" role="group" aria-label="食材类别">
+          {foodCategories.map((item) => (
+            <button key={item.id} className={category === item.id ? "active" : ""} onClick={() => onCategory(item.id)}>
+              <span>{item.emoji}</span><strong>{item.id}</strong><small>{item.hint}</small>
+            </button>
+          ))}
         </div>
-        <div className="field-label"><span>放在哪里</span><small>参考保鲜期会跟着变</small></div>
+        <div className="field-label step-label"><span><b>2</b> 再选具体食材</span><small>{categoryItems.length} 种常用选择</small></div>
+        <div className="quick-grid">
+          {categoryItems.map((item) => <button key={item.name} className={!customMode && choice.name === item.name ? "active" : ""} onClick={() => onChoose(item)}><span>{item.emoji}</span><b>{item.name}</b>{!customMode && choice.name === item.name && <i>✓</i>}</button>)}
+          <button className={`custom-trigger ${customMode ? "active" : ""}`} onClick={onCustom}><span>＋</span><b>自己添加</b>{customMode && <i>✓</i>}</button>
+        </div>
+        {customMode && (
+          <label className="custom-name">
+            <span>食材名称</span>
+            <input autoFocus maxLength={12} value={customName} onChange={(event) => onCustomName(event.target.value)} placeholder="例如：茼蒿、腊肠" aria-label="自定义食材名称" />
+          </label>
+        )}
+        <div className="field-label step-label"><span><b>3</b> 放在哪里</span><small>会自动给出参考保鲜期</small></div>
         <div className="storage-switch">
           {(["冷藏", "冷冻"] as Storage[]).map((item) => <button key={item} className={storage === item ? "active" : ""} onClick={() => onStorage(item)}>{item === "冷藏" ? "❄" : "✣"} {item}区</button>)}
         </div>
+        <div className="field-label step-label expiry-label"><span><b>4</b> 确认到期日</span><small>不合适可以改天数</small></div>
         <div className="date-editor">
-          <span><small>参考到期日</small><strong>{expiryText}</strong></span>
+          <span><small>{storage}参考到期日</small><strong>{expiryText}</strong></span>
           <label><span>保鲜</span><input type="number" min="1" max="90" value={days} onChange={(event) => onDays(Math.max(1, Number(event.target.value)))} aria-label="保鲜天数" /><b>天</b></label>
         </div>
-        <button className="primary-button" onClick={onAdd}>＋ 加入 {choice.name}{addedCount > 0 && <em>（本次已加 {addedCount} 件）</em>}</button>
+        <button className="primary-button" disabled={!choice.name} onClick={onAdd}>＋ {choice.name ? `加入 ${choice.name}` : "先输入食材名称"}{addedCount > 0 && <em>（本次已加 {addedCount} 件）</em>}</button>
         <button className="done-link" onClick={onClose}>完成入库</button>
       </section>
     </div>

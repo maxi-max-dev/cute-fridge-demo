@@ -36,3 +36,13 @@ test("includes the physical openable fridge interaction", async () => {
   assert.match(source, /fridge-compartment/);
   assert.match(source, /aria-expanded=\{open\}/);
 });
+
+test("quick add supports Chinese household categories and custom ingredients", async () => {
+  const source = await readFile(new URL("../app/FridgeDemo.tsx", import.meta.url), "utf8");
+  assert.match(source, /先选食材类别/);
+  assert.match(source, /蔬菜.*肉禽.*蛋奶.*水产.*豆制品.*主食速冻/s);
+  assert.match(source, /再选具体食材/);
+  assert.match(source, /自己添加/);
+  assert.match(source, /自定义食材名称/);
+  assert.match(source, /确认到期日/);
+});
