@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, type PointerEvent as ReactPointerEvent, useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type Storage = "冷藏" | "冷冻";
 type Tab = "today" | "fridge" | "recipes" | "shopping";
@@ -497,9 +497,42 @@ function FridgeView({ inventory, zone, setZone, onQuick, onDiscard }: { inventor
   const frozen = inventory.filter((item) => item.storage === "冷冻").sort((a, b) => a.days - b.days);
   const totalCount = inventory.reduce((sum, item) => sum + item.qty, 0);
   const expiredCount = inventory.filter((item) => item.days < 0).length;
+  const trashCorner = useRef<HTMLDivElement>(null);
+  const [draggingItem, setDraggingItem] = useState<Ingredient | null>(null);
+  const [dragPoint, setDragPoint] = useState({ x: 0, y: 0 });
+  const [overTrash, setOverTrash] = useState(false);
 
   function toggleZone(next: Storage) {
     setZone(zone === next ? null : next);
+  }
+
+  function isOverTrash(x: number, y: number) {
+    const box = trashCorner.current?.getBoundingClientRect();
+    if (!box) return false;
+    const margin = 14;
+    return x >= box.left - margin && x <= box.right + margin && y >= box.top - margin && y <= box.bottom + margin;
+  }
+
+  function beginFoodDrag(item: Ingredient, x: number, y: number) {
+    setDraggingItem(item);
+    setDragPoint({ x, y });
+    setOverTrash(isOverTrash(x, y));
+  }
+
+  function moveFoodDrag(x: number, y: number) {
+    setDragPoint({ x, y });
+    setOverTrash(isOverTrash(x, y));
+  }
+
+  function endFoodDrag(item: Ingredient, x: number, y: number) {
+    if (isOverTrash(x, y)) onDiscard(item.id);
+    setDraggingItem(null);
+    setOverTrash(false);
+  }
+
+  function cancelFoodDrag() {
+    setDraggingItem(null);
+    setOverTrash(false);
   }
 
   return (
@@ -518,6 +551,11 @@ function FridgeView({ inventory, zone, setZone, onQuick, onDiscard }: { inventor
           open={zone === "冷藏"}
           onToggle={() => toggleZone("冷藏")}
           onDiscard={onDiscard}
+          draggingId={draggingItem?.id ?? null}
+          onDragStart={beginFoodDrag}
+          onDragMove={moveFoodDrag}
+          onDragEnd={endFoodDrag}
+          onDragCancel={cancelFoodDrag}
         />
 
         <div className="fridge-divider"><span /></div>
@@ -528,6 +566,11 @@ function FridgeView({ inventory, zone, setZone, onQuick, onDiscard }: { inventor
           open={zone === "冷冻"}
           onToggle={() => toggleZone("冷冻")}
           onDiscard={onDiscard}
+          draggingId={draggingItem?.id ?? null}
+          onDragStart={beginFoodDrag}
+          onDragMove={moveFoodDrag}
+          onDragEnd={endFoodDrag}
+          onDragCancel={cancelFoodDrag}
         />
 
         <div className="fridge-feet"><i /><i /></div>
@@ -535,18 +578,32 @@ function FridgeView({ inventory, zone, setZone, onQuick, onDiscard }: { inventor
 
       <div className={`discard-station ${zone ? "ready" : ""}`} aria-label={`垃圾桶，${expiredCount}样食材已过期`}>
         <span>🗑️</span>
-        <div><strong>{expiredCount ? `${expiredCount} 样已过期，仍在冰箱里` : "垃圾桶在这里"}</strong><small>{zone ? "在食材卡上向左滑，直接丢掉" : "打开冰箱后，向左滑食材即可丢掉"}</small></div>
+        <div><strong>{expiredCount ? `${expiredCount} 样已过期，仍在冰箱里` : "垃圾桶在这里"}</strong><small>{zone ? "左滑，或拖动整张卡片到右下角" : "打开冰箱后，可左滑或整张拖走"}</small></div>
       </div>
       <p className="fridge-instruction">
         <span>{zone ? "↩" : "☝"}</span>
         {zone ? `${zone}门已打开，点“关门”或拉开另一扇门` : "点门板或把手，打开看看"}
       </p>
       <div className="legend"><span><i className="safe" />新鲜</span><span><i className="warning" />尽快吃</span><span><i className="danger" />快过期</span><span><i className="expired" />已过期</span></div>
+
+      <div ref={trashCorner} className={`corner-trash ${draggingItem ? "drag-ready" : ""} ${overTrash ? "drop-hot" : ""}`} aria-live="polite">
+        <span>🗑️</span><strong>{overTrash ? "松手丢掉" : draggingItem ? "拖到这里" : "拖来丢掉"}</strong>
+      </div>
+      {draggingItem && (
+        <div className={`food-drag-ghost ${overTrash ? "over-trash" : ""}`} style={{ left: dragPoint.x, top: dragPoint.y }} aria-hidden="true">
+          <FoodVisual item={draggingItem} className="drag-ghost-visual" />
+          <strong>{draggingItem.name}</strong><small>{inventoryStatus(draggingItem.days).label}</small>
+        </div>
+      )}
     </div>
   );
 }
 
-function FridgeCompartment({ storage, items, open, onToggle, onDiscard }: { storage: Storage; items: Ingredient[]; open: boolean; onToggle: () => void; onDiscard: (id: number) => void }) {
+function FridgeCompartment({ storage, items, open, onToggle, onDiscard, draggingId, onDragStart, onDragMove, onDragEnd, onDragCancel }: {
+  storage: Storage; items: Ingredient[]; open: boolean; onToggle: () => void; onDiscard: (id: number) => void; draggingId: number | null;
+  onDragStart: (item: Ingredient, x: number, y: number) => void; onDragMove: (x: number, y: number) => void;
+  onDragEnd: (item: Ingredient, x: number, y: number) => void; onDragCancel: () => void;
+}) {
   const urgentCount = items.filter((item) => item.days <= 3).length;
   const expiredCount = items.filter((item) => item.days < 0).length;
   const isChilled = storage === "冷藏";
@@ -562,7 +619,7 @@ function FridgeCompartment({ storage, items, open, onToggle, onDiscard }: { stor
         <div className="interior-food-grid">
           {items.map((item) => {
             const status = inventoryStatus(item.days);
-            return <SwipeFoodCard key={item.id} item={item} status={status} onDiscard={onDiscard} />;
+            return <SwipeFoodCard key={item.id} item={item} status={status} onDiscard={onDiscard} dragging={draggingId === item.id} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={onDragCancel} />;
           })}
         </div>
         <div className="glass-shelves"><i /><i />{isChilled && <i />}</div>
@@ -591,40 +648,58 @@ function FridgeCompartment({ storage, items, open, onToggle, onDiscard }: { stor
   );
 }
 
-function SwipeFoodCard({ item, status, onDiscard }: { item: Ingredient; status: ReturnType<typeof inventoryStatus>; onDiscard: (id: number) => void }) {
-  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
+function SwipeFoodCard({ item, status, onDiscard, dragging, onDragStart, onDragMove, onDragEnd, onDragCancel }: {
+  item: Ingredient; status: ReturnType<typeof inventoryStatus>; onDiscard: (id: number) => void; dragging: boolean;
+  onDragStart: (item: Ingredient, x: number, y: number) => void; onDragMove: (x: number, y: number) => void;
+  onDragEnd: (item: Ingredient, x: number, y: number) => void; onDragCancel: () => void;
+}) {
   const [offsetX, setOffsetX] = useState(0);
+  const gesture = useRef<{ x: number; y: number; mode: "pending" | "swipe" | "drag" } | null>(null);
 
-  function startSwipe(event: ReactPointerEvent<HTMLElement>) {
-    setStartPoint({ x: event.clientX, y: event.clientY });
+  function startGesture(event: ReactPointerEvent<HTMLElement>) {
+    gesture.current = { x: event.clientX, y: event.clientY, mode: "pending" };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
-  function moveSwipe(event: ReactPointerEvent<HTMLElement>) {
-    if (!startPoint) return;
-    const x = event.clientX - startPoint.x;
-    const y = event.clientY - startPoint.y;
-    if (x < 0 && Math.abs(x) > Math.abs(y)) setOffsetX(Math.max(-82, x));
+  function moveGesture(event: ReactPointerEvent<HTMLElement>) {
+    const active = gesture.current;
+    if (!active) return;
+    const x = event.clientX - active.x;
+    const y = event.clientY - active.y;
+    if (active.mode === "pending" && Math.hypot(x, y) >= 10) {
+      active.mode = x < -8 && Math.abs(x) > Math.abs(y) * 1.2 ? "swipe" : "drag";
+      if (active.mode === "drag") onDragStart(item, event.clientX, event.clientY);
+    }
+    if (active.mode === "swipe") setOffsetX(Math.max(-82, x));
+    if (active.mode === "drag") onDragMove(event.clientX, event.clientY);
   }
 
-  function endSwipe(event: ReactPointerEvent<HTMLElement>) {
-    if (!startPoint) return;
-    const distance = event.clientX - startPoint.x;
-    setStartPoint(null);
+  function endGesture(event: ReactPointerEvent<HTMLElement>) {
+    const active = gesture.current;
+    if (!active) return;
+    const distance = event.clientX - active.x;
+    if (active.mode === "swipe" && distance < -58) onDiscard(item.id);
+    if (active.mode === "drag") onDragEnd(item, event.clientX, event.clientY);
+    gesture.current = null;
     setOffsetX(0);
-    if (distance < -58) onDiscard(item.id);
+  }
+
+  function cancelGesture() {
+    if (gesture.current?.mode === "drag") onDragCancel();
+    gesture.current = null;
+    setOffsetX(0);
   }
 
   return (
-    <div className={`swipe-food ${status.tone}`}>
+    <div className={`swipe-food ${status.tone} ${dragging ? "is-dragging" : ""}`}>
       <button className="swipe-trash" onClick={() => onDiscard(item.id)} aria-label={`丢掉${item.name}`}><span>🗑️</span><small>丢掉</small></button>
       <article
         className={`shelf-food ${status.tone}`}
         style={{ transform: `translateX(${offsetX}px)` }}
-        onPointerDown={startSwipe}
-        onPointerMove={moveSwipe}
-        onPointerUp={endSwipe}
-        onPointerCancel={() => { setStartPoint(null); setOffsetX(0); }}
+        onPointerDown={startGesture}
+        onPointerMove={moveGesture}
+        onPointerUp={endGesture}
+        onPointerCancel={cancelGesture}
       >
         <FoodVisual item={item} className="shelf-food-emoji" />
         <strong>{item.name}</strong>

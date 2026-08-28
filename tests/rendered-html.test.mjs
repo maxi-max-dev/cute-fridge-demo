@@ -55,6 +55,19 @@ test("supports fruit, lamb, custom visuals, and swipe-to-discard expired food", 
   assert.match(source, /食材图标/);
   assert.match(source, /已过期.*天/);
   assert.match(source, /SwipeFoodCard/);
-  assert.match(source, /向左滑，直接丢掉/);
+  assert.match(source, /左滑，或拖动整张卡片/);
   assert.match(source, /setInventory\(\(current\) => current\.filter/);
+});
+
+test("supports dragging a whole food card into the bottom-right trash corner", async () => {
+  const source = await readFile(new URL("../app/FridgeDemo.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(source, /corner-trash/);
+  assert.match(source, /food-drag-ghost/);
+  assert.match(source, /拖动整张卡片到右下角/);
+  assert.match(source, /isOverTrash/);
+  assert.match(source, /onDragEnd\(item, event\.clientX, event\.clientY\)/);
+  assert.match(styles, /\.corner-trash/);
+  assert.match(styles, /position: fixed/);
+  assert.match(styles, /\.corner-trash\.drop-hot/);
 });
