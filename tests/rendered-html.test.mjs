@@ -42,7 +42,19 @@ test("quick add supports Chinese household categories and custom ingredients", a
   assert.match(source, /先选食材类别/);
   assert.match(source, /蔬菜.*肉禽.*蛋奶.*水产.*豆制品.*主食速冻/s);
   assert.match(source, /再选具体食材/);
-  assert.match(source, /自己添加/);
+  assert.match(source, /自己定制/);
   assert.match(source, /自定义食材名称/);
   assert.match(source, /确认到期日/);
+});
+
+test("supports fruit, lamb, custom visuals, and swipe-to-discard expired food", async () => {
+  const source = await readFile(new URL("../app/FridgeDemo.tsx", import.meta.url), "utf8");
+  assert.match(source, /category: "水果", name: "苹果"/);
+  assert.match(source, /category: "肉禽", name: "羊肉"/);
+  assert.match(source, /拍照或从相册选择/);
+  assert.match(source, /食材图标/);
+  assert.match(source, /已过期.*天/);
+  assert.match(source, /SwipeFoodCard/);
+  assert.match(source, /向左滑，直接丢掉/);
+  assert.match(source, /setInventory\(\(current\) => current\.filter/);
 });

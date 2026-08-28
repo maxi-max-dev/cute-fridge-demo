@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, type PointerEvent as ReactPointerEvent, useEffect, useMemo, useState } from "react";
 
 type Storage = "冷藏" | "冷冻";
 type Tab = "today" | "fridge" | "recipes" | "shopping";
-type FoodCategory = "蔬菜" | "肉禽" | "蛋奶" | "水产" | "豆制品" | "主食速冻";
+type FoodCategory = "蔬菜" | "水果" | "肉禽" | "蛋奶" | "水产" | "豆制品" | "主食速冻";
 
 type QuickItem = {
   category: FoodCategory;
   name: string;
   emoji: string;
+  image?: string;
   unit: string;
   chilled: number;
   frozen: number;
@@ -19,6 +20,7 @@ type Ingredient = {
   id: number;
   name: string;
   emoji: string;
+  image?: string;
   qty: number;
   unit: string;
   days: number;
@@ -49,6 +51,7 @@ const initialInventory: Ingredient[] = [
   { id: 8, name: "牛肉", emoji: "🥩", qty: 2, unit: "份", days: 18, storage: "冷冻", addedAt: "8月20日" },
   { id: 9, name: "虾仁", emoji: "🍤", qty: 1, unit: "袋", days: 24, storage: "冷冻", addedAt: "8月18日" },
   { id: 10, name: "水饺", emoji: "🥟", qty: 1, unit: "袋", days: 38, storage: "冷冻", addedAt: "8月10日" },
+  { id: 11, name: "生菜", emoji: "🥬", qty: 1, unit: "颗", days: -1, storage: "冷藏", addedAt: "8月24日" },
 ];
 
 const recipes: Recipe[] = [
@@ -62,6 +65,7 @@ const recipes: Recipe[] = [
 
 const foodCategories: { id: FoodCategory; emoji: string; hint: string }[] = [
   { id: "蔬菜", emoji: "🥬", hint: "叶菜瓜果" },
+  { id: "水果", emoji: "🍎", hint: "当季鲜果" },
   { id: "肉禽", emoji: "🥩", hint: "猪牛鸡鸭" },
   { id: "蛋奶", emoji: "🥚", hint: "蛋与奶" },
   { id: "水产", emoji: "🐟", hint: "鱼虾贝" },
@@ -78,8 +82,17 @@ const quickItems: QuickItem[] = [
   { category: "蔬菜", name: "茄子", emoji: "🍆", unit: "根", chilled: 4, frozen: 21 },
   { category: "蔬菜", name: "青椒", emoji: "🫑", unit: "个", chilled: 6, frozen: 30 },
   { category: "蔬菜", name: "蘑菇", emoji: "🍄", unit: "盒", chilled: 5, frozen: 21 },
+  { category: "水果", name: "苹果", emoji: "🍎", unit: "个", chilled: 14, frozen: 60 },
+  { category: "水果", name: "香蕉", emoji: "🍌", unit: "根", chilled: 5, frozen: 21 },
+  { category: "水果", name: "橙子", emoji: "🍊", unit: "个", chilled: 14, frozen: 45 },
+  { category: "水果", name: "葡萄", emoji: "🍇", unit: "串", chilled: 7, frozen: 30 },
+  { category: "水果", name: "草莓", emoji: "🍓", unit: "盒", chilled: 3, frozen: 30 },
+  { category: "水果", name: "西瓜", emoji: "🍉", unit: "个", chilled: 5, frozen: 30 },
+  { category: "水果", name: "梨", emoji: "🍐", unit: "个", chilled: 14, frozen: 60 },
+  { category: "水果", name: "蓝莓", emoji: "🫐", unit: "盒", chilled: 5, frozen: 30 },
   { category: "肉禽", name: "猪肉", emoji: "🥩", unit: "份", chilled: 2, frozen: 30 },
   { category: "肉禽", name: "牛肉", emoji: "🥩", unit: "份", chilled: 2, frozen: 30 },
+  { category: "肉禽", name: "羊肉", emoji: "🍖", unit: "份", chilled: 2, frozen: 30 },
   { category: "肉禽", name: "鸡胸", emoji: "🍗", unit: "份", chilled: 2, frozen: 30 },
   { category: "肉禽", name: "鸡腿", emoji: "🍗", unit: "只", chilled: 2, frozen: 30 },
   { category: "肉禽", name: "排骨", emoji: "🍖", unit: "份", chilled: 2, frozen: 30 },
@@ -106,6 +119,8 @@ const quickItems: QuickItem[] = [
   { category: "主食速冻", name: "馄饨", emoji: "🥣", unit: "袋", chilled: 3, frozen: 60 },
 ];
 
+const customIcons = ["🥬", "🍅", "🥕", "🍄", "🍎", "🍊", "🍓", "🥩", "🍖", "🍗", "🥚", "🐟", "🍤", "🫘", "🥟", "🍚"];
+
 const tabLabels: Record<Tab, string> = {
   today: "今天",
   fridge: "我的冰箱",
@@ -114,26 +129,27 @@ const tabLabels: Record<Tab, string> = {
 };
 
 function inventoryStatus(days: number) {
-  if (days <= 2) return { tone: "danger", label: days <= 0 ? "今天到期" : `剩 ${days} 天` };
+  if (days < 0) return { tone: "expired", label: `已过期 ${Math.abs(days)} 天` };
+  if (days <= 2) return { tone: "danger", label: days === 0 ? "今天到期" : `剩 ${days} 天` };
   if (days <= 5) return { tone: "warning", label: `剩 ${days} 天` };
   return { tone: "safe", label: `剩 ${days} 天` };
 }
 
 function missingFor(recipe: Recipe, inventory: Ingredient[]) {
-  const names = new Set(inventory.filter((item) => item.qty > 0).map((item) => item.name));
+  const names = new Set(inventory.filter((item) => item.qty > 0 && item.days >= 0).map((item) => item.name));
   return recipe.ingredients.filter((name) => !names.has(name));
 }
 
 function scoreRecipe(recipe: Recipe, inventory: Ingredient[]) {
-  const names = new Set(inventory.filter((item) => item.qty > 0).map((item) => item.name));
+  const names = new Set(inventory.filter((item) => item.qty > 0 && item.days >= 0).map((item) => item.name));
   const missing = missingFor(recipe, inventory).length;
   const mainReady = recipe.main.every((name) => names.has(name));
-  const expiring = inventory.filter((item) => item.days <= 3 && recipe.ingredients.includes(item.name)).length;
+  const expiring = inventory.filter((item) => item.days >= 0 && item.days <= 3 && recipe.ingredients.includes(item.name)).length;
   return expiring * 8 + (mainReady ? 7 : 0) + (missing === 0 ? 5 : missing <= 2 ? 3 - missing : -5);
 }
 
 function recipeReason(recipe: Recipe, inventory: Ingredient[]) {
-  const urgent = inventory.find((item) => item.days <= 3 && recipe.ingredients.includes(item.name));
+  const urgent = inventory.find((item) => item.days >= 0 && item.days <= 3 && recipe.ingredients.includes(item.name));
   const missing = missingFor(recipe, inventory);
   if (urgent && missing.length === 0) return `先用掉只剩 ${urgent.days} 天的${urgent.name}，食材全齐`;
   if (urgent) return `先用掉只剩 ${urgent.days} 天的${urgent.name}，主料已齐`;
@@ -156,6 +172,8 @@ export default function Home() {
   const [quickChoice, setQuickChoice] = useState(quickItems[0]);
   const [quickCustomMode, setQuickCustomMode] = useState(false);
   const [quickCustomName, setQuickCustomName] = useState("");
+  const [quickCustomEmoji, setQuickCustomEmoji] = useState("🥬");
+  const [quickCustomImage, setQuickCustomImage] = useState<string | undefined>();
   const [quickStorage, setQuickStorage] = useState<Storage>("冷藏");
   const [quickDays, setQuickDays] = useState(quickItems[0].chilled);
   const [addedCount, setAddedCount] = useState(0);
@@ -178,7 +196,7 @@ export default function Home() {
     return count >= 1 && count <= 2;
   });
   const cleanupRecipes = [...recipes]
-    .filter((recipe) => inventory.some((item) => item.days <= 3 && recipe.ingredients.includes(item.name)))
+    .filter((recipe) => inventory.some((item) => item.days >= 0 && item.days <= 3 && recipe.ingredients.includes(item.name)))
     .sort((a, b) => scoreRecipe(b, inventory) - scoreRecipe(a, inventory));
 
   function showToast(message: string) {
@@ -197,7 +215,7 @@ export default function Home() {
   }
 
   function beginCooking(recipe: Recipe) {
-    const available = recipe.ingredients.filter((name) => inventory.some((item) => item.name === name && item.qty > 0));
+    const available = recipe.ingredients.filter((name) => inventory.some((item) => item.name === name && item.qty > 0 && item.days >= 0));
     setConsumed(available);
     setSelectedRecipe(recipe);
     setCompletionOpen(true);
@@ -214,12 +232,13 @@ export default function Home() {
   }
 
   const resolvedQuickChoice: QuickItem = quickCustomMode
-    ? { category: quickCategory, name: quickCustomName.trim(), emoji: "🧺", unit: "份", chilled: 5, frozen: 30 }
+    ? { category: quickCategory, name: quickCustomName.trim(), emoji: quickCustomEmoji, image: quickCustomImage, unit: "份", chilled: 5, frozen: 30 }
     : quickChoice;
 
   function chooseQuick(item: QuickItem) {
     setQuickChoice(item);
     setQuickCustomMode(false);
+    setQuickCustomImage(undefined);
     setQuickDays(quickStorage === "冷藏" ? item.chilled : item.frozen);
   }
 
@@ -229,13 +248,36 @@ export default function Home() {
     setQuickChoice(firstItem);
     setQuickCustomMode(false);
     setQuickCustomName("");
+    setQuickCustomEmoji(foodCategories.find((item) => item.id === category)!.emoji);
+    setQuickCustomImage(undefined);
     setQuickDays(quickStorage === "冷藏" ? firstItem.chilled : firstItem.frozen);
   }
 
   function enableCustomQuick() {
     setQuickCustomMode(true);
     setQuickCustomName("");
+    setQuickCustomEmoji(foodCategories.find((item) => item.id === quickCategory)!.emoji);
+    setQuickCustomImage(undefined);
     setQuickDays(quickStorage === "冷藏" ? 5 : 30);
+  }
+
+  function chooseCustomIcon(emoji: string) {
+    setQuickCustomEmoji(emoji);
+    setQuickCustomImage(undefined);
+  }
+
+  function chooseCustomPhoto(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("图片太大，请选择 5MB 以内的照片");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") setQuickCustomImage(reader.result);
+    };
+    reader.readAsDataURL(file);
   }
 
   function changeStorage(storage: Storage) {
@@ -251,11 +293,21 @@ export default function Home() {
     setInventory((current) => {
       const same = current.find((food) => food.name === item.name && food.storage === quickStorage);
       if (same) return current.map((food) => food.id === same.id ? { ...food, qty: food.qty + 1, days: quickDays, addedAt: time } : food);
-      return [...current, { id: Date.now(), name: item.name, emoji: item.emoji, qty: 1, unit: item.unit, days: quickDays, storage: quickStorage, addedAt: time }];
+      return [...current, { id: Date.now(), name: item.name, emoji: item.emoji, image: item.image, qty: 1, unit: item.unit, days: quickDays, storage: quickStorage, addedAt: time }];
     });
     setAddedCount((count) => count + 1);
     showToast(`${item.name}已放进${quickStorage}区`);
-    if (quickCustomMode) setQuickCustomName("");
+    if (quickCustomMode) {
+      setQuickCustomName("");
+      setQuickCustomImage(undefined);
+    }
+  }
+
+  function discardIngredient(id: number) {
+    const item = inventory.find((food) => food.id === id);
+    if (!item) return;
+    setInventory((current) => current.filter((food) => food.id !== id));
+    showToast(`${item.name}已丢进垃圾桶`);
   }
 
   function navigate(next: Tab) {
@@ -301,6 +353,7 @@ export default function Home() {
               zone={fridgeZone}
               setZone={setFridgeZone}
               onQuick={() => setQuickOpen(true)}
+              onDiscard={discardIngredient}
             />
           )}
 
@@ -355,6 +408,8 @@ export default function Home() {
           choice={resolvedQuickChoice}
           customMode={quickCustomMode}
           customName={quickCustomName}
+          customEmoji={quickCustomEmoji}
+          customImage={quickCustomImage}
           storage={quickStorage}
           days={quickDays}
           addedCount={addedCount}
@@ -362,6 +417,8 @@ export default function Home() {
           onChoose={chooseQuick}
           onCustom={enableCustomQuick}
           onCustomName={setQuickCustomName}
+          onCustomIcon={chooseCustomIcon}
+          onCustomPhoto={chooseCustomPhoto}
           onStorage={changeStorage}
           onDays={setQuickDays}
           onAdd={addQuickItem}
@@ -394,7 +451,7 @@ function TodayView({ urgent, readyCount, inventoryCount, recommended, missing, r
       </section>
 
       <section className="quick-summary" aria-label="今日冰箱概览">
-        <button onClick={onFridge}><strong>{urgent.length}</strong><span>样快过期</span><i className="red-dot" /></button>
+        <button onClick={onFridge}><strong>{urgent.length}</strong><span>样待处理</span><i className="red-dot" /></button>
         <div className="summary-rule" />
         <button onClick={onRecipes}><strong>{readyCount}</strong><span>道马上能做</span></button>
         <div className="summary-rule" />
@@ -422,11 +479,11 @@ function TodayView({ urgent, readyCount, inventoryCount, recommended, missing, r
       </article>
 
       <section className="urgent-list">
-        <div className="section-title compact"><div><span className="pin-dot tomato" /><h2>抓紧吃掉</h2></div><button className="text-button" onClick={onFridge}>看冰箱 →</button></div>
+        <div className="section-title compact"><div><span className="pin-dot tomato" /><h2>临期与过期</h2></div><button className="text-button" onClick={onFridge}>看冰箱 →</button></div>
         <div className="urgent-strip">
           {urgent.slice(0, 3).map((item) => (
-            <button key={item.id} className="urgent-item" onClick={onRecipes}>
-              <span className="mini-sticker">{item.emoji}</span><span><strong>{item.name}</strong><small>{item.qty}{item.unit}</small></span><b>{item.days === 1 ? "明天到期" : `剩${item.days}天`}</b>
+            <button key={item.id} className="urgent-item" onClick={item.days < 0 ? onFridge : onRecipes}>
+              <FoodVisual item={item} className="mini-sticker" /><span><strong>{item.name}</strong><small>{item.qty}{item.unit}</small></span><b>{inventoryStatus(item.days).label}</b>
             </button>
           ))}
         </div>
@@ -435,10 +492,11 @@ function TodayView({ urgent, readyCount, inventoryCount, recommended, missing, r
   );
 }
 
-function FridgeView({ inventory, zone, setZone, onQuick }: { inventory: Ingredient[]; zone: Storage | null; setZone: (zone: Storage | null) => void; onQuick: () => void }) {
+function FridgeView({ inventory, zone, setZone, onQuick, onDiscard }: { inventory: Ingredient[]; zone: Storage | null; setZone: (zone: Storage | null) => void; onQuick: () => void; onDiscard: (id: number) => void }) {
   const chilled = inventory.filter((item) => item.storage === "冷藏").sort((a, b) => a.days - b.days);
   const frozen = inventory.filter((item) => item.storage === "冷冻").sort((a, b) => a.days - b.days);
   const totalCount = inventory.reduce((sum, item) => sum + item.qty, 0);
+  const expiredCount = inventory.filter((item) => item.days < 0).length;
 
   function toggleZone(next: Storage) {
     setZone(zone === next ? null : next);
@@ -459,6 +517,7 @@ function FridgeView({ inventory, zone, setZone, onQuick }: { inventory: Ingredie
           items={chilled}
           open={zone === "冷藏"}
           onToggle={() => toggleZone("冷藏")}
+          onDiscard={onDiscard}
         />
 
         <div className="fridge-divider"><span /></div>
@@ -468,22 +527,28 @@ function FridgeView({ inventory, zone, setZone, onQuick }: { inventory: Ingredie
           items={frozen}
           open={zone === "冷冻"}
           onToggle={() => toggleZone("冷冻")}
+          onDiscard={onDiscard}
         />
 
         <div className="fridge-feet"><i /><i /></div>
       </div>
 
+      <div className={`discard-station ${zone ? "ready" : ""}`} aria-label={`垃圾桶，${expiredCount}样食材已过期`}>
+        <span>🗑️</span>
+        <div><strong>{expiredCount ? `${expiredCount} 样已过期，仍在冰箱里` : "垃圾桶在这里"}</strong><small>{zone ? "在食材卡上向左滑，直接丢掉" : "打开冰箱后，向左滑食材即可丢掉"}</small></div>
+      </div>
       <p className="fridge-instruction">
         <span>{zone ? "↩" : "☝"}</span>
         {zone ? `${zone}门已打开，点“关门”或拉开另一扇门` : "点门板或把手，打开看看"}
       </p>
-      <div className="legend"><span><i className="safe" />新鲜</span><span><i className="warning" />尽快吃</span><span><i className="danger" />快过期</span></div>
+      <div className="legend"><span><i className="safe" />新鲜</span><span><i className="warning" />尽快吃</span><span><i className="danger" />快过期</span><span><i className="expired" />已过期</span></div>
     </div>
   );
 }
 
-function FridgeCompartment({ storage, items, open, onToggle }: { storage: Storage; items: Ingredient[]; open: boolean; onToggle: () => void }) {
+function FridgeCompartment({ storage, items, open, onToggle, onDiscard }: { storage: Storage; items: Ingredient[]; open: boolean; onToggle: () => void; onDiscard: (id: number) => void }) {
   const urgentCount = items.filter((item) => item.days <= 3).length;
+  const expiredCount = items.filter((item) => item.days < 0).length;
   const isChilled = storage === "冷藏";
 
   return (
@@ -497,14 +562,7 @@ function FridgeCompartment({ storage, items, open, onToggle }: { storage: Storag
         <div className="interior-food-grid">
           {items.map((item) => {
             const status = inventoryStatus(item.days);
-            return (
-              <article className={`shelf-food ${status.tone}`} key={item.id}>
-                <span className="shelf-food-emoji">{item.emoji}</span>
-                <strong>{item.name}</strong>
-                <small>{item.qty}{item.unit}</small>
-                <b>{status.label}</b>
-              </article>
-            );
+            return <SwipeFoodCard key={item.id} item={item} status={status} onDiscard={onDiscard} />;
           })}
         </div>
         <div className="glass-shelves"><i /><i />{isChilled && <i />}</div>
@@ -522,7 +580,7 @@ function FridgeCompartment({ storage, items, open, onToggle }: { storage: Storag
           <>
             <span className="door-magnet magnet-tomato">🍅</span>
             <span className="door-magnet magnet-egg">🥚</span>
-            <span className="door-note"><b>{urgentCount || "✓"}</b><small>{urgentCount ? "样要先吃" : "状态很好"}</small></span>
+            <span className="door-note"><b>{urgentCount || "✓"}</b><small>{expiredCount ? `${expiredCount}样要丢` : urgentCount ? "样要先吃" : "状态很好"}</small></span>
           </>
         ) : (
           <span className="freezer-snow">✦ <i>❄</i> ·</span>
@@ -531,6 +589,55 @@ function FridgeCompartment({ storage, items, open, onToggle }: { storage: Storag
       </button>
     </section>
   );
+}
+
+function SwipeFoodCard({ item, status, onDiscard }: { item: Ingredient; status: ReturnType<typeof inventoryStatus>; onDiscard: (id: number) => void }) {
+  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
+  const [offsetX, setOffsetX] = useState(0);
+
+  function startSwipe(event: ReactPointerEvent<HTMLElement>) {
+    setStartPoint({ x: event.clientX, y: event.clientY });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveSwipe(event: ReactPointerEvent<HTMLElement>) {
+    if (!startPoint) return;
+    const x = event.clientX - startPoint.x;
+    const y = event.clientY - startPoint.y;
+    if (x < 0 && Math.abs(x) > Math.abs(y)) setOffsetX(Math.max(-82, x));
+  }
+
+  function endSwipe(event: ReactPointerEvent<HTMLElement>) {
+    if (!startPoint) return;
+    const distance = event.clientX - startPoint.x;
+    setStartPoint(null);
+    setOffsetX(0);
+    if (distance < -58) onDiscard(item.id);
+  }
+
+  return (
+    <div className={`swipe-food ${status.tone}`}>
+      <button className="swipe-trash" onClick={() => onDiscard(item.id)} aria-label={`丢掉${item.name}`}><span>🗑️</span><small>丢掉</small></button>
+      <article
+        className={`shelf-food ${status.tone}`}
+        style={{ transform: `translateX(${offsetX}px)` }}
+        onPointerDown={startSwipe}
+        onPointerMove={moveSwipe}
+        onPointerUp={endSwipe}
+        onPointerCancel={() => { setStartPoint(null); setOffsetX(0); }}
+      >
+        <FoodVisual item={item} className="shelf-food-emoji" />
+        <strong>{item.name}</strong>
+        <small>{item.qty}{item.unit}</small>
+        <b>{status.label}</b>
+      </article>
+    </div>
+  );
+}
+
+function FoodVisual({ item, className }: { item: { emoji: string; image?: string }; className: string }) {
+  if (item.image) return <img className={`${className} food-photo`} src={item.image} alt="自定义食材缩略图" draggable={false} />;
+  return <span className={className}>{item.emoji}</span>;
 }
 
 function RecipesView({ inventory, ready, almost, cleanup, onOpen }: { inventory: Ingredient[]; ready: Recipe[]; almost: Recipe[]; cleanup: Recipe[]; onOpen: (recipe: Recipe) => void }) {
@@ -612,7 +719,7 @@ function RecipeSheet({ recipe, inventory, onClose, onAdd, onCook }: { recipe: Re
 }
 
 function CompletionSheet({ recipe, inventory, consumed, setConsumed, onClose, onFinish }: { recipe: Recipe; inventory: Ingredient[]; consumed: string[]; setConsumed: React.Dispatch<React.SetStateAction<string[]>>; onClose: () => void; onFinish: () => void }) {
-  const available = recipe.ingredients.filter((name) => inventory.some((item) => item.name === name));
+  const available = recipe.ingredients.filter((name) => inventory.some((item) => item.name === name && item.days >= 0));
   return (
     <div className="overlay">
       <section className="sheet completion-sheet" role="dialog" aria-modal="true" aria-labelledby="completion-title">
@@ -623,7 +730,7 @@ function CompletionSheet({ recipe, inventory, consumed, setConsumed, onClose, on
           {available.map((name) => {
             const item = inventory.find((food) => food.name === name)!;
             const active = consumed.includes(name);
-            return <button key={name} className={active ? "active" : ""} onClick={() => setConsumed((current) => active ? current.filter((food) => food !== name) : [...current, name])}><span>{item.emoji}</span><strong>{name}</strong><small>现有 {item.qty}{item.unit}</small><i>{active ? "✓" : ""}</i></button>;
+            return <button key={name} className={active ? "active" : ""} onClick={() => setConsumed((current) => active ? current.filter((food) => food !== name) : [...current, name])}><FoodVisual item={item} className="consume-food-visual" /><strong>{name}</strong><small>现有 {item.qty}{item.unit}</small><i>{active ? "✓" : ""}</i></button>;
           })}
         </div>
         <button className="primary-button" disabled={!consumed.length} onClick={onFinish}>确认消耗 {consumed.length} 样食材</button>
@@ -632,9 +739,10 @@ function CompletionSheet({ recipe, inventory, consumed, setConsumed, onClose, on
   );
 }
 
-function QuickAddSheet({ category, choice, customMode, customName, storage, days, addedCount, onCategory, onChoose, onCustom, onCustomName, onStorage, onDays, onAdd, onClose }: {
-  category: FoodCategory; choice: QuickItem; customMode: boolean; customName: string; storage: Storage; days: number; addedCount: number;
+function QuickAddSheet({ category, choice, customMode, customName, customEmoji, customImage, storage, days, addedCount, onCategory, onChoose, onCustom, onCustomName, onCustomIcon, onCustomPhoto, onStorage, onDays, onAdd, onClose }: {
+  category: FoodCategory; choice: QuickItem; customMode: boolean; customName: string; customEmoji: string; customImage?: string; storage: Storage; days: number; addedCount: number;
   onCategory: (category: FoodCategory) => void; onChoose: (item: QuickItem) => void; onCustom: () => void; onCustomName: (name: string) => void;
+  onCustomIcon: (emoji: string) => void; onCustomPhoto: (event: ChangeEvent<HTMLInputElement>) => void;
   onStorage: (storage: Storage) => void; onDays: (days: number) => void; onAdd: () => void; onClose: () => void;
 }) {
   const expiry = new Date(); expiry.setDate(expiry.getDate() + days);
@@ -656,13 +764,26 @@ function QuickAddSheet({ category, choice, customMode, customName, storage, days
         <div className="field-label step-label"><span><b>2</b> 再选具体食材</span><small>{categoryItems.length} 种常用选择</small></div>
         <div className="quick-grid">
           {categoryItems.map((item) => <button key={item.name} className={!customMode && choice.name === item.name ? "active" : ""} onClick={() => onChoose(item)}><span>{item.emoji}</span><b>{item.name}</b>{!customMode && choice.name === item.name && <i>✓</i>}</button>)}
-          <button className={`custom-trigger ${customMode ? "active" : ""}`} onClick={onCustom}><span>＋</span><b>自己添加</b>{customMode && <i>✓</i>}</button>
+          <button className={`custom-trigger ${customMode ? "active" : ""}`} onClick={onCustom} aria-label="自己定制食材"><span>＋</span><b>自己定制</b>{customMode && <i>✓</i>}</button>
         </div>
         {customMode && (
-          <label className="custom-name">
-            <span>食材名称</span>
-            <input autoFocus maxLength={12} value={customName} onChange={(event) => onCustomName(event.target.value)} placeholder="例如：茼蒿、腊肠" aria-label="自定义食材名称" />
-          </label>
+          <div className="custom-composer">
+            <label className="custom-name">
+              <span>食材名称</span>
+              <input autoFocus maxLength={12} value={customName} onChange={(event) => onCustomName(event.target.value)} placeholder="例如：茼蒿、腊肠" aria-label="自定义食材名称" />
+            </label>
+            <div className="custom-visual-heading"><span>选一个图案</span><small>也可以直接拍下它</small></div>
+            <div className="custom-visual-row">
+              <div className="custom-preview"><FoodVisual item={{ emoji: customEmoji, image: customImage }} className="custom-preview-visual" /></div>
+              <div className="icon-picker" role="group" aria-label="食材图标">
+                {customIcons.map((emoji) => <button key={emoji} className={!customImage && customEmoji === emoji ? "active" : ""} onClick={() => onCustomIcon(emoji)} aria-label={`选择${emoji}图标`}>{emoji}</button>)}
+              </div>
+            </div>
+            <label className={`photo-picker ${customImage ? "has-photo" : ""}`}>
+              <input type="file" accept="image/*" onChange={onCustomPhoto} />
+              <span>{customImage ? "✓" : "📷"}</span><strong>{customImage ? "已使用这张照片" : "拍照或从相册选择"}</strong><small>会显示为食材缩略图</small>
+            </label>
+          </div>
         )}
         <div className="field-label step-label"><span><b>3</b> 放在哪里</span><small>会自动给出参考保鲜期</small></div>
         <div className="storage-switch">
