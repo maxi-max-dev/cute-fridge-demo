@@ -55,7 +55,7 @@ test("supports fruit, lamb, custom visuals, and swipe-to-discard expired food", 
   assert.match(source, /食材图标/);
   assert.match(source, /已过期.*天/);
   assert.match(source, /SwipeFoodCard/);
-  assert.match(source, /左滑，或拖动整张卡片/);
+  assert.match(source, /左滑删除，或拖到右下角/);
   assert.match(source, /setInventory\(\(current\) => current\.filter/);
 });
 
@@ -65,13 +65,25 @@ test("supports dragging a whole food card into the bottom-right trash corner", a
   assert.match(source, /corner-trash/);
   assert.match(source, /food-drag-ghost/);
   assert.match(source, /createPortal/);
-  assert.match(source, /拖动整张卡片到右下角/);
+  assert.match(source, /拖动.*到右下角垃圾桶/);
   assert.match(source, /isOverTrash/);
   assert.match(source, /window\.addEventListener\("pointermove"/);
   assert.match(source, /onDragEnd\(item, upEvent\.clientX, upEvent\.clientY\)/);
   assert.match(styles, /\.corner-trash/);
   assert.match(styles, /position: fixed/);
   assert.match(styles, /\.corner-trash\.drop-hot/);
+});
+
+test("lets crowded fridge compartments scroll without breaking card gestures", async () => {
+  const source = await readFile(new URL("../app/FridgeDemo.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(source, /interior-scroll/);
+  assert.match(source, /上下滑看更多/);
+  assert.match(source, /mode: "pending" \| "scroll" \| "swipe" \| "drag"/);
+  assert.match(source, /isVerticalScroll/);
+  assert.match(styles, /\.interior-scroll \{[^}]*overflow-y: auto/);
+  assert.match(styles, /touch-action: pan-y/);
+  assert.match(styles, /\.interior-scroll-cue/);
 });
 
 test("loads current weather from IP geolocation with a visible fallback", async () => {

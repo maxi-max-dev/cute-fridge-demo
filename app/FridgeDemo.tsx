@@ -681,11 +681,11 @@ function FridgeView({ inventory, zone, setZone, onQuick, onDiscard }: { inventor
 
       <div className={`discard-station ${zone ? "ready" : ""}`} aria-label={`垃圾桶，${expiredCount}样食材已过期`}>
         <span>🗑️</span>
-        <div><strong>{expiredCount ? `${expiredCount} 样已过期，仍在冰箱里` : "垃圾桶在这里"}</strong><small>{zone ? "左滑，或拖动整张卡片到右下角" : "打开冰箱后，可左滑或整张拖走"}</small></div>
+        <div><strong>{expiredCount ? `${expiredCount} 样已过期，仍在冰箱里` : "垃圾桶在这里"}</strong><small>{zone ? "上下滑看更多；左滑删除，或拖到右下角" : "打开冰箱后，可上下滑看全部食材"}</small></div>
       </div>
       <p className="fridge-instruction">
         <span>{zone ? "↩" : "☝"}</span>
-        {zone ? `${zone}门已打开，点“关门”或拉开另一扇门` : "点门板或把手，打开看看"}
+        {zone ? `${zone}门已打开，上下滑看全部；点“关门”可收起` : "点门板或把手，打开看看"}
       </p>
       <div className="legend"><span><i className="safe" />新鲜</span><span><i className="warning" />尽快吃</span><span><i className="danger" />快过期</span><span><i className="expired" />已过期</span></div>
 
@@ -714,22 +714,27 @@ function FridgeCompartment({ storage, items, open, onToggle, onDiscard, dragging
   const urgentCount = items.filter((item) => item.days <= 3).length;
   const expiredCount = items.filter((item) => item.days < 0).length;
   const isChilled = storage === "冷藏";
+  const visibleCapacity = isChilled ? 9 : 3;
+  const hasOverflow = items.length > visibleCapacity;
 
   return (
     <section className={`fridge-compartment ${isChilled ? "chilled-compartment" : "frozen-compartment"} ${open ? "is-open" : ""}`} aria-label={`${storage}区`}>
-      <div className="fridge-interior">
+      <div className={`fridge-interior ${hasOverflow ? "has-overflow" : ""}`}>
         <div className="interior-heading">
           <span><i>{isChilled ? "❄" : "✣"}</i><strong>{storage}区</strong><small>{items.length} 样</small></span>
           <button onClick={onToggle} aria-label={`关闭${storage}区`}>关门 ×</button>
         </div>
         {isChilled && <span className="interior-light" />}
-        <div className="interior-food-grid">
-          {items.map((item) => {
-            const status = inventoryStatus(item.days);
-            return <SwipeFoodCard key={item.id} item={item} status={status} onDiscard={onDiscard} dragging={draggingId === item.id} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={onDragCancel} />;
-          })}
+        <div className={`interior-scroll ${hasOverflow ? "has-more" : ""}`} role="region" aria-label={`${storage}区食材，${items.length}样${hasOverflow ? "，可上下滑动查看更多" : ""}`}>
+          <div className="interior-food-grid">
+            {items.map((item) => {
+              const status = inventoryStatus(item.days);
+              return <SwipeFoodCard key={item.id} item={item} status={status} onDiscard={onDiscard} dragging={draggingId === item.id} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={onDragCancel} />;
+            })}
+          </div>
         </div>
         <div className="glass-shelves"><i /><i />{isChilled && <i />}</div>
+        {hasOverflow && <span className="interior-scroll-cue" aria-hidden="true">↕ 上下滑看更多</span>}
         {!items.length && <div className="empty-compartment"><span>🧊</span><p>这里空出来了</p></div>}
       </div>
 
@@ -761,7 +766,7 @@ function SwipeFoodCard({ item, status, onDiscard, dragging, onDragStart, onDragM
   onDragEnd: (item: Ingredient, x: number, y: number) => void; onDragCancel: () => void;
 }) {
   const [offsetX, setOffsetX] = useState(0);
-  const gesture = useRef<{ x: number; y: number; mode: "pending" | "swipe" | "drag" } | null>(null);
+  const gesture = useRef<{ x: number; y: number; mode: "pending" | "scroll" | "swipe" | "drag" } | null>(null);
   const removeWindowListeners = useRef<() => void>(() => undefined);
 
   useEffect(() => () => removeWindowListeners.current(), []);
@@ -779,7 +784,13 @@ function SwipeFoodCard({ item, status, onDiscard, dragging, onDragStart, onDragM
       const x = moveEvent.clientX - active.x;
       const y = moveEvent.clientY - active.y;
       if (active.mode === "pending" && Math.hypot(x, y) >= 8) {
-        active.mode = x < -8 && Math.abs(x) > Math.abs(y) * 1.25 ? "swipe" : "drag";
+        const isVerticalScroll = Math.abs(y) > Math.abs(x) * 1.25;
+        active.mode = isVerticalScroll ? "scroll" : x < -8 ? "swipe" : "drag";
+        if (active.mode === "scroll") {
+          gesture.current = null;
+          removeWindowListeners.current();
+          return;
+        }
         if (active.mode === "drag") onDragStart(item, moveEvent.clientX, moveEvent.clientY);
       }
       if (active.mode !== "pending") moveEvent.preventDefault();
